@@ -97,7 +97,17 @@ const struct frr_yang_module_info frr_pathd_info = {
 		},
 		{
 			.xpath = "/frr-pathd:pathd/srte/segment-list/segment/srv6sid",
-			.cbs = {.modify = dummy_modify, .destroy = dummy_destroy}
+			.cbs = {
+				.modify = dummy_modify, 
+			    .destroy = dummy_destroy
+			},
+		},
+		{
+			.xpath = "/frr-pathd:pathd/srte/segment-list/segment/srv6sidlen",
+			.cbs = {
+				.modify = dummy_modify, 
+			    .destroy = dummy_destroy
+			},
 		},
 		{
 			.xpath = "/frr-pathd:pathd/srte/segment-list/segment/nai",

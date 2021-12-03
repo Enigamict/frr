@@ -93,6 +93,10 @@ module frr-pathd {
           type inet:ip-address;
           description "Segment Routing global configuration.";
         }
+        leaf srv6sidlen {
+            type uint8;
+            mandatory true;
+        }
         container nai {
           presence "The segment has a Node or Adjacency Identifier";
           leaf type {
