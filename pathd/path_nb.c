@@ -96,6 +96,10 @@ const struct frr_yang_module_info frr_pathd_info = {
 			.priority = NB_DFLT_PRIORITY - 1
 		},
 		{
+			.xpath = "/frr-pathd:pathd/srte/segment-list/segment/srv6sid",
+			.cbs = {.modify = dummy_modify, .destroy = dummy_destroy}
+		},
+		{
 			.xpath = "/frr-pathd:pathd/srte/segment-list/segment/nai",
 			.cbs = {
 				.create = dummy_create,

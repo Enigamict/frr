@@ -295,6 +295,7 @@ struct srte_candidate {
 
 	/* Flags. */
 	uint32_t flags;
+
 #define F_CANDIDATE_BEST 0x0001
 #define F_CANDIDATE_NEW 0x0002
 #define F_CANDIDATE_MODIFIED 0x0004

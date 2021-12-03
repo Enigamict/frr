@@ -22,7 +22,6 @@
 #include "log.h"
 #include "lib_errors.h"
 #include "network.h"
-#include "libfrr.h"
 
 #include "pathd/pathd.h"
 #include "pathd/path_zebra.h"
@@ -82,7 +81,7 @@ struct srte_segment_list_head srte_segment_lists =
 static inline int srte_candidate_compare(const struct srte_candidate *a,
 					 const struct srte_candidate *b)
 {
-	return a->preference - b->preference;
+	return a->preference - b->preference;	
 }
 RB_GENERATE(srte_candidate_head, srte_candidate, entry, srte_candidate_compare)
 
@@ -646,6 +645,9 @@ void srte_policy_apply_changes(struct srte_policy *policy)
 	}
 }
 
+
+
+
 /**
  * Adds a candidate path to a policy.
  *
@@ -681,6 +683,7 @@ struct srte_candidate *srte_candidate_add(struct srte_policy *policy,
 	}
 	lsp->candidate = candidate;
 	candidate->lsp = lsp;
+
 
 	RB_INSERT(srte_candidate_head, &policy->candidate_paths, candidate);
 
@@ -1116,6 +1119,7 @@ void srte_candidate_status_update(struct srte_candidate *candidate, int status)
 	case ZEBRA_SR_POLICY_UP:
 		switch (policy->status) {
 		case SRTE_POLICY_STATUS_UP:
+			zlog_debug("hey");
 			return;
 		default:
 			zlog_debug("SR-TE(%s, %u): policy is UP", endpoint,
@@ -1224,7 +1228,6 @@ void pathd_shutdown(void)
 {
 	path_ted_teardown();
 	srte_clean_zebra();
-	frr_fini();
 }
 
 void trigger_pathd_candidate_created(struct srte_candidate *candidate)

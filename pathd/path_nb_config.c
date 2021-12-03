@@ -139,7 +139,39 @@ int pathd_srte_segment_list_segment_destroy(struct nb_cb_destroy_args *args)
 
 	return NB_OK;
 }
+int pathd_srte_segment_list_segment_srv6_sid_modify(
+	struct nb_cb_modify_args *args)
+{
+	struct ipaddr local_addr, remote_addr;
+	struct srte_segment_entry *segment;
+	zlog_debug("test");
 
+	if (args->event != NB_EV_APPLY)
+		return NB_OK;
+
+	yang_dnode_get_ip(&remote_addr, args->dnode,
+				  "./srv6sid");
+	SET_FLAG(segment->segment_list->flags, F_SEGMENT_LIST_MODIFIED);
+
+	return NB_OK;
+}
+
+int pathd_srte_segment_list_segment_srv6_sid_destroy(
+	struct nb_cb_modify_args *args)
+{
+
+	struct srte_segment_entry *segment;
+
+	if (args->event != NB_EV_APPLY)
+		return NB_OK;
+
+	segment = nb_running_unset_entry(args->dnode);
+	SET_FLAG(segment->segment_list->flags, F_SEGMENT_LIST_MODIFIED);
+
+	srte_segment_entry_del(segment);
+
+	return NB_OK;
+}
 /*
  * XPath: /frr-pathd:pathd/srte/segment-list/segment/sid-value
  */
@@ -445,6 +477,26 @@ int pathd_srte_policy_candidate_path_name_modify(struct nb_cb_modify_args *args)
 	name = yang_dnode_get_string(args->dnode, NULL);
 	strlcpy(candidate->name, name, sizeof(candidate->name));
 	SET_FLAG(candidate->flags, F_CANDIDATE_MODIFIED);
+
+	return NB_OK;
+}
+
+int pathd_srte_policy_candidate_path_weight_modify(struct nb_cb_modify_args *args)
+{
+
+	uint32_t weight;
+	struct srte_policy *policy;
+	struct srte_candidate *candidate;
+
+	if (args->event != NB_EV_APPLY)
+		return NB_OK;
+
+	
+	policy = nb_running_get_entry(args->dnode, NULL, true);
+	weight = yang_dnode_get_uint32(args->dnode, NULL);
+	//candidate = srte_weight_add(policy, preference, SRTE_ORIGIN_LOCAL, NULL);
+	// nb_running_set_entry(args->dnode, candidate);
+	// SET_FLAG(candidate->flags, F_CANDIDATE_NEW);
 
 	return NB_OK;
 }

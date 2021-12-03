@@ -84,10 +84,14 @@ module frr-pathd {
           leaf index {
             type uint32;
             description "Segment index";
-	  }
+	      }
         leaf sid-value {
           type rt-types:mpls-label;
           description "MPLS label value";
+          }
+        leaf srv6sid {
+          type inet:ip-address;
+          description "Segment Routing global configuration.";
         }
         container nai {
           presence "The segment has a Node or Adjacency Identifier";
@@ -236,6 +240,7 @@ module frr-pathd {
             config false;
             description "Candidate path distinguisher";
           }
+          
           leaf type {
             description
               "Type of the Candidate Path.";
