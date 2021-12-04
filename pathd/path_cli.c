@@ -483,22 +483,21 @@ int srv6_prefix(
 {
 	char buf_prefix[INET6_ADDRSTRLEN];
 
-	uint32_t ted_sid = MPLS_LABEL_NONE;
 	struct prefix prefix_cli = {};
 	struct ipaddr pre_ipaddr = {};
 	/* Prefix */
-		inet_ntop(AF_INET6, &prefix_cli.u.prefix6, buf_prefix,
-			  sizeof(buf_prefix));
-		pre_ipaddr.ipa_type = IPADDR_V6;
-		pre_ipaddr.ip._v6_addr = prefix_cli.u.prefix6;
-	
+	inet_ntop(AF_INET6, &prefix_cli.u.prefix6, buf_prefix,
+		  sizeof(buf_prefix));
+	pre_ipaddr.ipa_type = IPADDR_V6;
+	pre_ipaddr.ip._v6_addr = prefix_cli.u.prefix6;
+
 	snprintf(xpath, XPATH_MAXLEN, "./segment[index='%s']/srv6sid",
 		 index_str);
 	nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY, buf_prefix);
-	snprintf(xpath, XPATH_MAXLEN,
-		 "./segment[index='%s']/srv6sidlen", index_str);
-	nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY,
-				      strchr(prefix_ipv6_str, '/') + 1);
+	//snprintf(xpath, XPATH_MAXLEN,
+	//	 "./segment[index='%s']/srv6sidlen", index_str);
+	//nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY,
+	//			      strchr(prefix_ipv6_str, '/') + 1);
 	/* Alg / Iface */
 	return CMD_SUCCESS;
 }
@@ -548,10 +547,9 @@ DEFPY(srte_segment_list_segment, srte_segment_list_segment_cmd,
 	nb_cli_enqueue_change(vty, xpath, NB_OP_CREATE, NULL);
 
 	if (has_srv6 != NULL) {
-		status = srv6_prefix(vty, xpath, index, index_str,
-					 prefix_str, prefix_str);
-		if (status != CMD_SUCCESS)
-			return status;
+		zlog_debug("%s", prefix_str);
+		snprintf(xpath, sizeof(xpath),
+			 "./segment[index='%s']/srv6sid", index_str);
 		return nb_cli_apply_changes(vty, NULL);
 	}
 
@@ -608,7 +606,7 @@ void cli_show_srte_segment_list_segment(struct vty *vty,
 	}
 	if (yang_dnode_exists(dnode, "./srv6sid")) {
 		struct ipaddr addr;
-		yang_dnode_get_ip(&addr, dnode, "./srv6sidlen");
+		yang_dnode_get_ip(&addr, dnode, "./srv6sid");
 		vty_out(vty, " srv6 prefix %pI6", &addr.ipaddr_v6);
 	}
 	

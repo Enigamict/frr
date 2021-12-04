@@ -94,8 +94,8 @@ module frr-pathd {
           description "Segment Routing global configuration.";
         }
         leaf srv6sidlen {
-            type uint8;
-            mandatory true;
+          type uint8;
+          description "Segment Routing global configuration.";
         }
         container nai {
           presence "The segment has a Node or Adjacency Identifier";

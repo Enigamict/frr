@@ -142,7 +142,7 @@ int pathd_srte_segment_list_segment_destroy(struct nb_cb_destroy_args *args)
 int pathd_srte_segment_list_segment_srv6_sid_modify(
 	struct nb_cb_modify_args *args)
 {
-	struct ipaddr local_addr, remote_addr;
+	struct ipaddr remote_addr;
 	struct srte_segment_entry *segment;
 	zlog_debug("test");
 

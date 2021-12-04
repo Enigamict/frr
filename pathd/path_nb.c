@@ -98,8 +98,8 @@ const struct frr_yang_module_info frr_pathd_info = {
 		{
 			.xpath = "/frr-pathd:pathd/srte/segment-list/segment/srv6sid",
 			.cbs = {
-				.modify = dummy_modify, 
-			    .destroy = dummy_destroy
+				.modify = pathd_srte_segment_list_segment_srv6_sid_modify,
+			    .destroy = dummy_destroy,
 			},
 		},
 		{
