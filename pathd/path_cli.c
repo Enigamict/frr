@@ -499,11 +499,10 @@ int srv6_prefix(
 	snprintf(xpath, XPATH_MAXLEN, "./segment[index='%s']/srv6sid",
 		 index_str);
 	nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY, buf_prefix);
-	//snprintf(xpath, XPATH_MAXLEN,
-	//	 "./segment[index='%s']/srv6sidlen", index_str);
-	//nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY,
-	//			      strchr(prefix_ipv6_str, '/') + 1);
-	/* Alg / Iface */
+	snprintf(xpath, XPATH_MAXLEN,
+		 "./segment[index='%s']/srv6sidlen", index_str);
+	nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY,
+				      strchr(prefix_ipv6_str, '/') + 1);
 	return CMD_SUCCESS;
 }
 /*
@@ -614,7 +613,11 @@ void cli_show_srte_segment_list_segment(struct vty *vty,
 		yang_dnode_get_ip(&addr, dnode, "./srv6sid");
 		vty_out(vty, " srv6 prefix %pI6", &addr.ipaddr_v6);
 	}
-	
+	if (yang_dnode_exists(dnode, "./srv6sidlen")) {
+		vty_out(vty, "/%s",
+			yang_dnode_get_string(dnode, "./srv6sidlen"));
+	}
+
 	if (yang_dnode_exists(dnode, "./nai")) {
 		struct ipaddr addr;
 		struct ipaddr addr_rmt;

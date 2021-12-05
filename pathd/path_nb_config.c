@@ -139,39 +139,7 @@ int pathd_srte_segment_list_segment_destroy(struct nb_cb_destroy_args *args)
 
 	return NB_OK;
 }
-int pathd_srte_segment_list_segment_srv6_sid_modify(
-	struct nb_cb_modify_args *args)
-{
-	struct ipaddr remote_addr;
-	struct srte_segment_entry *segment;
-	zlog_debug("test");
 
-	if (args->event != NB_EV_APPLY)
-		return NB_OK;
-
-	yang_dnode_get_ip(&remote_addr, args->dnode,
-				  "./srv6sid");
-	SET_FLAG(segment->segment_list->flags, F_SEGMENT_LIST_MODIFIED);
-
-	return NB_OK;
-}
-
-int pathd_srte_segment_list_segment_srv6_sid_destroy(
-	struct nb_cb_modify_args *args)
-{
-
-	struct srte_segment_entry *segment;
-
-	if (args->event != NB_EV_APPLY)
-		return NB_OK;
-
-	segment = nb_running_unset_entry(args->dnode);
-	SET_FLAG(segment->segment_list->flags, F_SEGMENT_LIST_MODIFIED);
-
-	srte_segment_entry_del(segment);
-
-	return NB_OK;
-}
 /*
  * XPath: /frr-pathd:pathd/srte/segment-list/segment/sid-value
  */
