@@ -442,6 +442,7 @@ int segment_list_has_prefix(
 			      prefix_ipv4_str
 				      ? strchr(prefix_ipv4_str, '/') + 1
 				      : strchr(prefix_ipv6_str, '/') + 1);
+	zlog_debug("%s",strchr(prefix_ipv4_str, '/'));
 	/* Alg / Iface */
 	if (has_algo != NULL) {
 		snprintf(xpath, XPATH_MAXLEN,
@@ -485,6 +486,10 @@ int srv6_prefix(
 
 	struct prefix prefix_cli = {};
 	struct ipaddr pre_ipaddr = {};
+	if (!str2prefix(prefix_ipv6_str, &prefix_cli)) {
+		vty_out(vty, "%% Malformed prefix\n");
+		return CMD_WARNING_CONFIG_FAILED;
+	}
 	/* Prefix */
 	inet_ntop(AF_INET6, &prefix_cli.u.prefix6, buf_prefix,
 		  sizeof(buf_prefix));
@@ -548,8 +553,8 @@ DEFPY(srte_segment_list_segment, srte_segment_list_segment_cmd,
 
 	if (has_srv6 != NULL) {
 		zlog_debug("%s", prefix_str);
-		snprintf(xpath, sizeof(xpath),
-			 "./segment[index='%s']/srv6sid", index_str);
+		srv6_prefix(vty, xpath, index, index_str,prefix,prefix_str);
+
 		return nb_cli_apply_changes(vty, NULL);
 	}
 
