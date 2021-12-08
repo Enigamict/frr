@@ -60,6 +60,9 @@ static int segment_list_has_prefix(
 static int srv6_prefix(
 	struct vty *vty, char *xpath, long index, const char *index_str,
 	const struct prefix_ipv6 *prefix_ipv6, const char *prefix_ipv6_str);
+static int srv6_sid_list(
+	struct vty *vty, char *xpath, long index, const char *index_str,
+	const struct prefix_ipv6 *prefix_ipv6, const char *prefix_ipv6_str);
 
 DEFINE_MTYPE_STATIC(PATHD, PATH_CLI, "Client");
 
@@ -442,7 +445,6 @@ int segment_list_has_prefix(
 			      prefix_ipv4_str
 				      ? strchr(prefix_ipv4_str, '/') + 1
 				      : strchr(prefix_ipv6_str, '/') + 1);
-	zlog_debug("%s",strchr(prefix_ipv4_str, '/'));
 	/* Alg / Iface */
 	if (has_algo != NULL) {
 		snprintf(xpath, XPATH_MAXLEN,
@@ -478,33 +480,6 @@ int segment_list_has_prefix(
 	return CMD_SUCCESS;
 }
 
-int srv6_prefix(
-	struct vty *vty, char *xpath, long index, const char *index_str,
-	const struct prefix_ipv6 *prefix_ipv6, const char *prefix_ipv6_str)
-{
-	char buf_prefix[INET6_ADDRSTRLEN];
-
-	struct prefix prefix_cli = {};
-	struct ipaddr pre_ipaddr = {};
-	if (!str2prefix(prefix_ipv6_str, &prefix_cli)) {
-		vty_out(vty, "%% Malformed prefix\n");
-		return CMD_WARNING_CONFIG_FAILED;
-	}
-	/* Prefix */
-	inet_ntop(AF_INET6, &prefix_cli.u.prefix6, buf_prefix,
-		  sizeof(buf_prefix));
-	pre_ipaddr.ipa_type = IPADDR_V6;
-	pre_ipaddr.ip._v6_addr = prefix_cli.u.prefix6;
-
-	snprintf(xpath, XPATH_MAXLEN, "./segment[index='%s']/srv6sid",
-		 index_str);
-	nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY, buf_prefix);
-	snprintf(xpath, XPATH_MAXLEN,
-		 "./segment[index='%s']/srv6sidlen", index_str);
-	nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY,
-				      strchr(prefix_ipv6_str, '/') + 1);
-	return CMD_SUCCESS;
-}
 /*
  * XPath: /frr-pathd:pathd/srte/segment-list/segment
  */
@@ -551,9 +526,17 @@ DEFPY(srte_segment_list_segment, srte_segment_list_segment_cmd,
 	nb_cli_enqueue_change(vty, xpath, NB_OP_CREATE, NULL);
 
 	if (has_srv6 != NULL) {
-		zlog_debug("%s", prefix_str);
-		srv6_prefix(vty, xpath, index, index_str,prefix,prefix_str);
-
+		char buf_prefix[INET6_ADDRSTRLEN];
+		struct prefix prefix_cli = {};
+		if (!str2prefix(prefix_str, &prefix_cli)) {
+			vty_out(vty, "%% srv6 sid error\n");
+			return CMD_WARNING_CONFIG_FAILED;
+		}
+		inet_ntop(AF_INET6, &prefix_cli.u.prefix6, buf_prefix,
+			  sizeof(buf_prefix));
+		snprintf(xpath, sizeof(xpath),
+			 "./segment[index='%s']/srv6sid", index_str);
+		nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY, buf_prefix);
 		return nb_cli_apply_changes(vty, NULL);
 	}
 
@@ -611,11 +594,7 @@ void cli_show_srte_segment_list_segment(struct vty *vty,
 	if (yang_dnode_exists(dnode, "./srv6sid")) {
 		struct ipaddr addr;
 		yang_dnode_get_ip(&addr, dnode, "./srv6sid");
-		vty_out(vty, " srv6 prefix %pI6", &addr.ipaddr_v6);
-	}
-	if (yang_dnode_exists(dnode, "./srv6sidlen")) {
-		vty_out(vty, "/%s",
-			yang_dnode_get_string(dnode, "./srv6sidlen"));
+		vty_out(vty, " srv6 sid %pI6", &addr.ipaddr_v6);
 	}
 
 	if (yang_dnode_exists(dnode, "./nai")) {

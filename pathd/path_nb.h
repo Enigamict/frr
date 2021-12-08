@@ -39,6 +39,8 @@ int pathd_srte_segment_list_protocol_origin_modify(
 int pathd_srte_segment_list_originator_modify(struct nb_cb_modify_args *args);
 int pathd_srte_segment_list_segment_sid_value_modify(
 	struct nb_cb_modify_args *args);
+int pathd_srte_segment_list_segment_srv6_modify(
+	struct nb_cb_modify_args *args);
 int pathd_srte_segment_list_segment_nai_destroy(
 	struct nb_cb_destroy_args *args);
 void pathd_srte_segment_list_segment_nai_apply_finish(

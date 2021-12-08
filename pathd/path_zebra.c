@@ -109,7 +109,6 @@ static void path_zebra_connected(struct zclient *zclient)
 			continue;
 
 		path_zebra_add_sr_policy(policy, segment_list);
-		path_zebra_add_srv6_policy(policy);
 	}
 }
 
@@ -182,6 +181,8 @@ void path_zebra_add_sr_policy(struct srte_policy *policy,
 {
 	struct zapi_sr_policy zp = {};
 	struct srte_segment_entry *segment;
+	char buf_prefix[INET6_ADDRSTRLEN];
+
 
 	zp.color = policy->color;
 	zp.endpoint = policy->endpoint;
@@ -189,27 +190,14 @@ void path_zebra_add_sr_policy(struct srte_policy *policy,
 	zp.segment_list.type = ZEBRA_LSP_SRTE;
 	zp.segment_list.local_label = policy->binding_sid;
 	zp.segment_list.label_num = 0;
-	inet_pton(AF_INET6, "2001:db8:1000::2", &zp.segment_list.segs);
+	RB_FOREACH (segment, srte_segment_entry_head, &segment_list->segments)
+		zp.segment_list.segs[0] =
+			segment->srv6_sid;
 	policy->status = SRTE_POLICY_STATUS_GOING_UP;
 
 	(void)zebra_send_sr_policy(zclient, ZEBRA_SR_POLICY_SET, &zp);
 }
 
-void path_zebra_add_srv6_policy(struct srte_policy *policy)
-{
-	struct zapi_sr_policy zp = {};
-	struct srte_segment_entry *segment;
-
-	zp.color = policy->color;
-	zp.endpoint = policy->endpoint;
-	strlcpy(zp.name, policy->name, sizeof(zp.name));
-	zp.segment_list.type = ZEBRA_LSP_SRTE;
-	zp.segment_list.local_label = policy->binding_sid;
-	zp.segment_list.label_num = 0;
-	policy->status = SRTE_POLICY_STATUS_GOING_UP;
-
-	(void)zebra_send_sr_policy(zclient, ZEBRA_SR_POLICY_SET, &zp);
-}
 
 /**
  * Deletes a segment policy from Zebra.
