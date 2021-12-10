@@ -57,12 +57,6 @@ static int segment_list_has_prefix(
 	const struct prefix_ipv6 *prefix_ipv6, const char *prefix_ipv6_str,
 	const char *has_algo, long algo, const char *algo_str,
 	const char *has_iface_id, long iface_id, const char *iface_id_str);
-static int srv6_prefix(
-	struct vty *vty, char *xpath, long index, const char *index_str,
-	const struct prefix_ipv6 *prefix_ipv6, const char *prefix_ipv6_str);
-static int srv6_sid_list(
-	struct vty *vty, char *xpath, long index, const char *index_str,
-	const struct prefix_ipv6 *prefix_ipv6, const char *prefix_ipv6_str);
 
 DEFINE_MTYPE_STATIC(PATHD, PATH_CLI, "Client");
 
@@ -304,14 +298,15 @@ DEFPY(srte_no_segment_list,
 	return nb_cli_apply_changes(vty, NULL);
 }
 
-void cli_show_srte_segment_list(struct vty *vty, struct lyd_node *dnode,
+void cli_show_srte_segment_list(struct vty *vty, const struct lyd_node *dnode,
 				bool show_defaults)
 {
 	vty_out(vty, "  segment-list %s\n",
 		yang_dnode_get_string(dnode, "./name"));
 }
 
-void cli_show_srte_segment_list_end(struct vty *vty, struct lyd_node *dnode)
+void cli_show_srte_segment_list_end(struct vty *vty,
+				    const struct lyd_node *dnode)
 {
 	vty_out(vty, "  exit\n");
 }
@@ -479,13 +474,12 @@ int segment_list_has_prefix(
 	}
 	return CMD_SUCCESS;
 }
-
 /*
  * XPath: /frr-pathd:pathd/srte/segment-list/segment
  */
 /* clang-format off */
 DEFPY(srte_segment_list_segment, srte_segment_list_segment_cmd,
-      "index (0-4294967295)$index <[mpls$has_mpls_label label (16-1048575)$label]"
+      "index (0-4294967295)$index <[mpls$has_mpls_label label (16-1048575)$label] "
       "|"
       "[nai$has_nai <"
       "prefix <A.B.C.D/M$prefix_ipv4|X:X::X:X/M$prefix_ipv6>"
@@ -493,8 +487,8 @@ DEFPY(srte_segment_list_segment, srte_segment_list_segment_cmd,
       "| adjacency$has_adj "
       "<A.B.C.D$adj_src_ipv4 A.B.C.D$adj_dst_ipv4|X:X::X:X$adj_src_ipv6 X:X::X:X$adj_dst_ipv6>"
       ">]"
-	  "|"
-	  "[srv6$has_srv6 <X:X::X:X/M$prefix>]"
+      "|"
+      "[srv6$has_srv6 <X:X::X:X/M$prefix>]"
       ">",
       "Index\n"
       "Index Value\n"
@@ -515,7 +509,7 @@ DEFPY(srte_segment_list_segment, srte_segment_list_segment_cmd,
       "ADJ IPv6 src identifier\n"
       "ADJ IPv6 dst identifier\n"
       "srv6\n"
-      "srv6_sid\n")
+      "srv6 sid")
 /* clang-format on */
 {
 	char xpath[XPATH_MAXLEN];
@@ -525,25 +519,22 @@ DEFPY(srte_segment_list_segment, srte_segment_list_segment_cmd,
 	snprintf(xpath, sizeof(xpath), "./segment[index='%s']", index_str);
 	nb_cli_enqueue_change(vty, xpath, NB_OP_CREATE, NULL);
 
-	if (has_srv6 != NULL) {
-		char buf_prefix[INET6_ADDRSTRLEN];
-		struct prefix prefix_cli = {};
-		if (!str2prefix(prefix_str, &prefix_cli)) {
-			vty_out(vty, "%% srv6 sid error\n");
-			return CMD_WARNING_CONFIG_FAILED;
-		}
-		inet_ntop(AF_INET6, &prefix_cli.u.prefix6, buf_prefix,
-			  sizeof(buf_prefix));
-		snprintf(xpath, sizeof(xpath),
-			 "./segment[index='%s']/srv6sid", index_str);
-		nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY, buf_prefix);
-		return nb_cli_apply_changes(vty, NULL);
-	}
-
 	if (has_mpls_label != NULL) {
 		snprintf(xpath, sizeof(xpath),
 			 "./segment[index='%s']/sid-value", index_str);
 		nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY, label_str);
+		return nb_cli_apply_changes(vty, NULL);
+	}
+	if (has_srv6 != NULL) {
+		struct prefix prefix_cli = {};
+		char buf_prefix[INET6_ADDRSTRLEN];
+		str2prefix(prefix_str, &prefix_cli);
+		inet_ntop(AF_INET6, &prefix_cli.u.prefix6, buf_prefix,
+			  sizeof(buf_prefix));
+		zlog_debug("%s", buf_prefix);
+		snprintf(xpath, sizeof(xpath),
+			 "./segment[index='%s']/srv6sid", index_str);
+		nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY, buf_prefix);
 		return nb_cli_apply_changes(vty, NULL);
 	}
 
@@ -583,7 +574,7 @@ DEFPY(srte_segment_list_no_segment,
 }
 
 void cli_show_srte_segment_list_segment(struct vty *vty,
-					struct lyd_node *dnode,
+					const struct lyd_node *dnode,
 					bool show_defaults)
 {
 	vty_out(vty, "   index %s", yang_dnode_get_string(dnode, "./index"));
@@ -591,12 +582,6 @@ void cli_show_srte_segment_list_segment(struct vty *vty,
 		vty_out(vty, " mpls label %s",
 			yang_dnode_get_string(dnode, "./sid-value"));
 	}
-	if (yang_dnode_exists(dnode, "./srv6sid")) {
-		struct ipaddr addr;
-		yang_dnode_get_ip(&addr, dnode, "./srv6sid");
-		vty_out(vty, " srv6 sid %pI6", &addr.ipaddr_v6);
-	}
-
 	if (yang_dnode_exists(dnode, "./nai")) {
 		struct ipaddr addr;
 		struct ipaddr addr_rmt;
@@ -700,7 +685,7 @@ DEFPY(srte_no_policy,
 	return nb_cli_apply_changes(vty, NULL);
 }
 
-void cli_show_srte_policy(struct vty *vty, struct lyd_node *dnode,
+void cli_show_srte_policy(struct vty *vty, const struct lyd_node *dnode,
 			  bool show_defaults)
 {
 	vty_out(vty, "  policy color %s endpoint %s\n",
@@ -708,7 +693,7 @@ void cli_show_srte_policy(struct vty *vty, struct lyd_node *dnode,
 		yang_dnode_get_string(dnode, "./endpoint"));
 }
 
-void cli_show_srte_policy_end(struct vty *vty, struct lyd_node *dnode)
+void cli_show_srte_policy_end(struct vty *vty, const struct lyd_node *dnode)
 {
 	vty_out(vty, "  exit\n");
 }
@@ -740,8 +725,8 @@ DEFPY(srte_policy_no_name,
 }
 
 
-void cli_show_srte_policy_name(struct vty *vty, struct lyd_node *dnode,
-				     bool show_defaults)
+void cli_show_srte_policy_name(struct vty *vty, const struct lyd_node *dnode,
+			       bool show_defaults)
 {
 	vty_out(vty, "   name %s\n", yang_dnode_get_string(dnode, NULL));
 }
@@ -773,7 +758,7 @@ DEFPY(srte_policy_no_binding_sid,
 }
 
 void cli_show_srte_policy_binding_sid(struct vty *vty,
-				      struct lyd_node *dnode,
+				      const struct lyd_node *dnode,
 				      bool show_defaults)
 {
 	vty_out(vty, "   binding-sid %s\n", yang_dnode_get_string(dnode, NULL));
@@ -1219,7 +1204,7 @@ static int config_write_metric_cb(const struct lyd_node *dnode, void *arg)
 }
 
 void cli_show_srte_policy_candidate_path(struct vty *vty,
-					 struct lyd_node *dnode,
+					 const struct lyd_node *dnode,
 					 bool show_defaults)
 {
 	float bandwidth;
@@ -1285,7 +1270,7 @@ void cli_show_srte_policy_candidate_path(struct vty *vty,
 }
 
 void cli_show_srte_policy_candidate_path_end(struct vty *vty,
-					     struct lyd_node *dnode)
+					     const struct lyd_node *dnode)
 {
 	const char *type = yang_dnode_get_string(dnode, "./type");
 
@@ -1297,7 +1282,7 @@ static int config_write_dnode(const struct lyd_node *dnode, void *arg)
 {
 	struct vty *vty = arg;
 
-	nb_cli_show_dnode_cmds(vty, (struct lyd_node *)dnode, false);
+	nb_cli_show_dnode_cmds(vty, dnode, false);
 
 	return YANG_ITER_CONTINUE;
 }

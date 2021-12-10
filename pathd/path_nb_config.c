@@ -163,19 +163,20 @@ int pathd_srte_segment_list_segment_sid_value_modify(
 int pathd_srte_segment_list_segment_srv6_modify(
 	struct nb_cb_modify_args *args)
 {
+	struct in6_addr sid;
 	struct srte_segment_entry *segment;
-	struct ipaddr sid;
-	char buf_prefix[INET6_ADDRSTRLEN];
+
 	if (args->event != NB_EV_APPLY)
 		return NB_OK;
 
 	segment = nb_running_get_entry(args->dnode, NULL, true);
-	yang_dnode_get_ip(&sid, args->dnode, NULL);
-	segment->srv6_sid = sid;
+	yang_dnode_get_ipv6(&sid, args->dnode, NULL);
+	segment->sid = sid;
 	SET_FLAG(segment->segment_list->flags, F_SEGMENT_LIST_MODIFIED);
 
 	return NB_OK;
 }
+
 int pathd_srte_segment_list_segment_sid_value_destroy(
 	struct nb_cb_destroy_args *args)
 {
@@ -464,7 +465,6 @@ int pathd_srte_policy_candidate_path_name_modify(struct nb_cb_modify_args *args)
 
 	return NB_OK;
 }
-
 
 
 static int affinity_filter_modify(struct nb_cb_modify_args *args,

@@ -118,8 +118,6 @@ static int path_zebra_sr_policy_notify_status(ZAPI_CALLBACK_ARGS)
 	struct srte_policy *policy;
 	struct srte_candidate *best_candidate_path;
 
-	zlog_debug("%d", zapi_sr_policy.status);
-
 	if (zapi_sr_policy_notify_status_decode(zclient->ibuf, &zapi_sr_policy))
 		return -1;
 
@@ -181,8 +179,6 @@ void path_zebra_add_sr_policy(struct srte_policy *policy,
 {
 	struct zapi_sr_policy zp = {};
 	struct srte_segment_entry *segment;
-	char buf_prefix[INET6_ADDRSTRLEN];
-
 
 	zp.color = policy->color;
 	zp.endpoint = policy->endpoint;
@@ -191,13 +187,12 @@ void path_zebra_add_sr_policy(struct srte_policy *policy,
 	zp.segment_list.local_label = policy->binding_sid;
 	zp.segment_list.label_num = 0;
 	RB_FOREACH (segment, srte_segment_entry_head, &segment_list->segments)
-		zp.segment_list.segs[0] =
-			segment->srv6_sid;
+		zp.segment_list.labels[zp.segment_list.label_num++] =
+			segment->sid_value;
 	policy->status = SRTE_POLICY_STATUS_GOING_UP;
 
 	(void)zebra_send_sr_policy(zclient, ZEBRA_SR_POLICY_SET, &zp);
 }
-
 
 /**
  * Deletes a segment policy from Zebra.
@@ -325,6 +320,12 @@ static int path_zebra_opaque_msg_handler(ZAPI_CALLBACK_ARGS)
 	return ret;
 }
 
+static zclient_handler *const path_handlers[] = {
+	[ZEBRA_SR_POLICY_NOTIFY_STATUS] = path_zebra_sr_policy_notify_status,
+	[ZEBRA_ROUTER_ID_UPDATE] = path_zebra_router_id_update,
+	[ZEBRA_OPAQUE_MESSAGE] = path_zebra_opaque_msg_handler,
+};
+
 /**
  * Initializes Zebra asynchronous connection.
  *
@@ -336,15 +337,13 @@ void path_zebra_init(struct thread_master *master)
 	options.synchronous = true;
 
 	/* Initialize asynchronous zclient. */
-	zclient = zclient_new(master, &zclient_options_default);
+	zclient = zclient_new(master, &zclient_options_default, path_handlers,
+			      array_size(path_handlers));
 	zclient_init(zclient, ZEBRA_ROUTE_SRTE, 0, &pathd_privs);
 	zclient->zebra_connected = path_zebra_connected;
-	zclient->sr_policy_notify_status = path_zebra_sr_policy_notify_status;
-	zclient->router_id_update = path_zebra_router_id_update;
-	zclient->opaque_msg_handler = path_zebra_opaque_msg_handler;
 
 	/* Initialize special zclient for synchronous message exchanges. */
-	zclient_sync = zclient_new(master, &options);
+	zclient_sync = zclient_new(master, &options, NULL, 0);
 	zclient_sync->sock = -1;
 	zclient_sync->redist_default = ZEBRA_ROUTE_SRTE;
 	zclient_sync->instance = 1;
