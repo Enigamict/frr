@@ -377,6 +377,27 @@ int pathd_srte_policy_binding_sid_modify(struct nb_cb_modify_args *args)
 	return NB_OK;
 }
 
+int pathd_srte_policy_binding_sid_srv6_modify(struct nb_cb_modify_args *args)
+{
+	struct srte_policy *policy;
+
+	struct in6_addr sid;
+
+	yang_dnode_get_ipv6(&sid, args->dnode, NULL);
+	zlog_debug("a");
+
+	switch (args->event) {
+	case NB_EV_VALIDATE:
+		break;
+	case NB_EV_APPLY:
+		policy = nb_running_get_entry(args->dnode, NULL, true);
+		policy->binding_sid_srv6 = sid;
+		SET_FLAG(policy->flags, F_POLICY_MODIFIED);
+		break;
+	}
+
+	return NB_OK;
+}
 int pathd_srte_policy_binding_sid_destroy(struct nb_cb_destroy_args *args)
 {
 	struct srte_policy *policy;

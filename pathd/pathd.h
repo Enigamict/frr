@@ -343,6 +343,8 @@ struct srte_policy {
 	/* Binding SID */
 	mpls_label_t binding_sid;
 
+	struct in6_addr binding_sid_srv6;
+
 	/* The Protocol-Origin. */
 	enum srte_protocol_origin protocol_origin;
 

@@ -161,11 +161,18 @@ const struct frr_yang_module_info frr_pathd_info = {
 			}
 		},
 		{
-			.xpath = "/frr-pathd:pathd/srte/policy/binding-sid",
+			.xpath = "/frr-pathd:pathd/srte/policy/binding-sid-mpls",
 			.cbs = {
 				.modify = pathd_srte_policy_binding_sid_modify,
 				.cli_show = cli_show_srte_policy_binding_sid,
 				.destroy = pathd_srte_policy_binding_sid_destroy,
+			}
+		},
+		{
+			.xpath = "/frr-pathd:pathd/srte/policy/binding-sid-srv6",
+			.cbs = {
+				.modify = pathd_srte_policy_binding_sid_srv6_modify,
+				.destroy = dummy_destroy,
 			}
 		},
 		{

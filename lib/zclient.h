@@ -608,6 +608,7 @@ struct zapi_srte_tunnel {
 	uint8_t label_num;
 	mpls_label_t labels[MPLS_MAX_LABELS];
 	struct in6_addr sid;
+	struct in6_addr local_srv6_sid;
 };
 
 struct zapi_sr_policy {

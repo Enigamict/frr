@@ -3280,7 +3280,7 @@ int zapi_sr_policy_encode(struct stream *s, int cmd, struct zapi_sr_policy *zp)
 	stream_write(s, &zp->name, SRTE_POLICY_NAME_MAX_LENGTH);
 
 	stream_putc(s, zt->type);
-	stream_putl(s, zt->local_label);
+	stream_put(s, &zt->local_srv6_sid, sizeof(zt->local_srv6_sid));
 
 	if (zt->label_num > MPLS_MAX_LABELS) {
 		flog_err(EC_LIB_ZAPI_ENCODE,
@@ -3294,8 +3294,16 @@ int zapi_sr_policy_encode(struct stream *s, int cmd, struct zapi_sr_policy *zp)
 	for (int i = 0; i < zt->label_num; i++)
 		stream_putl(s, zt->labels[i]);
 
+	stream_put(s, &zt->sid, sizeof(zt->sid));
 	/* Put length at the first point of the stream. */
 	stream_putw_at(s, 0, stream_get_endp(s));
+	char buf_prefix[INET6_ADDRSTRLEN];
+	inet_ntop(AF_INET6, &zt->sid, buf_prefix,
+		  sizeof(buf_prefix));
+	zlog_debug("%s:put srv6sid", buf_prefix);
+	inet_ntop(AF_INET6, &zt->local_srv6_sid, buf_prefix,
+		  sizeof(buf_prefix));
+	zlog_debug("%s:put localsid", buf_prefix);
 
 	return 0;
 }
@@ -3312,7 +3320,7 @@ int zapi_sr_policy_decode(struct stream *s, struct zapi_sr_policy *zp)
 
 	/* segment list of active candidate path */
 	STREAM_GETC(s, zt->type);
-	STREAM_GETL(s, zt->local_label);
+	STREAM_GET(&zt->local_srv6_sid, s, sizeof(zt->local_srv6_sid));
 	STREAM_GETW(s, zt->label_num);
 	if (zt->label_num > MPLS_MAX_LABELS) {
 		flog_err(EC_LIB_ZAPI_ENCODE,
@@ -3324,6 +3332,14 @@ int zapi_sr_policy_decode(struct stream *s, struct zapi_sr_policy *zp)
 	for (int i = 0; i < zt->label_num; i++)
 		STREAM_GETL(s, zt->labels[i]);
 
+	STREAM_GET(&zt->sid, s, sizeof(zt->sid));
+	char buf_prefix[INET6_ADDRSTRLEN];
+	inet_ntop(AF_INET6, &zt->sid, buf_prefix,
+		  sizeof(buf_prefix));
+	zlog_debug("%s:get srv6sid", buf_prefix);
+	inet_ntop(AF_INET6, &zt->local_srv6_sid, buf_prefix,
+		  sizeof(buf_prefix));
+	zlog_debug("%s:get localsid", buf_prefix);
 	return 0;
 
 stream_failure:

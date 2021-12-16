@@ -189,8 +189,13 @@ module frr-pathd {
           description
             "Name of the SR Policy.";
         }
-        leaf binding-sid {
+        leaf binding-sid-mpls {
           type rt-types:mpls-label;
+          description
+            "BSID of the SR Policy.";
+        }
+        leaf binding-sid-srv6 {
+          type inet:ip-address;
           description
             "BSID of the SR Policy.";
         }
