@@ -222,6 +222,14 @@ static void zebra_sr_policy_activate(struct zebra_sr_policy *policy,
 	zebra_sr_policy_notify_update(policy);
 }
 
+static void zebra_srv6_policy_activate(struct zebra_sr_policy *policy)
+{
+	policy->status = ZEBRA_SR_POLICY_UP;
+	(void)zebra_srv6_policy_bsid_install(policy);
+//	zsend_sr_policy_notify_status(policy->color, &policy->endpoint,
+//				      policy->name, ZEBRA_SR_POLICY_UP);
+//	zebra_sr_policy_notify_update(policy);
+}
 static void zebra_sr_policy_update(struct zebra_sr_policy *policy,
 				   struct zebra_lsp *lsp,
 				   struct zapi_srte_tunnel *old_tunnel)
@@ -282,11 +290,18 @@ int zebra_sr_policy_validate(struct zebra_sr_policy *policy,
 		return -1;
 	}
 
+	zlog_debug("%d", policy->status);
 	/* First label was resolved successfully. */
 	if (policy->status == ZEBRA_SR_POLICY_DOWN)
 		zebra_sr_policy_activate(policy, lsp);
 	else
 		zebra_sr_policy_update(policy, lsp, &old_tunnel);
+
+	return 0;
+}
+
+int zebra_srv6_policy_bsid_install(struct zebra_sr_policy *policy)
+{
 
 	return 0;
 }

@@ -61,6 +61,7 @@ struct zebra_sr_policy *zebra_sr_policy_find_by_name(char *name);
 int zebra_sr_policy_validate(struct zebra_sr_policy *policy,
 			     struct zapi_srte_tunnel *new_tunnel);
 int zebra_sr_policy_bsid_install(struct zebra_sr_policy *policy);
+int zebra_srv6_policy_bsid_install(struct zebra_sr_policy *policy);
 void zebra_sr_policy_bsid_uninstall(struct zebra_sr_policy *policy,
 				    mpls_label_t old_bsid);
 void zebra_srte_init(void);
