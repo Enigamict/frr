@@ -44,7 +44,7 @@ struct zebra_sr_policy {
 	enum zebra_sr_policy_status status;
 	struct zapi_srte_tunnel segment_list;
 	struct zebra_lsp *lsp;
-	struct zebra_srv6te_entry *test;
+	struct zebra_srv6te_nexthop *nhsle;
 	struct zebra_vrf *zvrf;
 };
 RB_HEAD(zebra_sr_policy_instance_head, zebra_sr_policy);
@@ -53,7 +53,7 @@ RB_PROTOTYPE(zebra_sr_policy_instance_head, zebra_sr_policy, entry,
 
 extern struct zebra_sr_policy_instance_head zebra_sr_policy_instances;
 
-struct zebra_srv6te_bsid {
+struct zebra_srv6te_nexthop {
 	struct nexthop *nexthop;
 };
 struct zebra_sr_policy *

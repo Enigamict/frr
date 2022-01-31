@@ -134,20 +134,9 @@ static int zebra_srv6_policy_notify_update_client(struct zebra_sr_policy *policy
 			  __func__, policy->endpoint.ipa_type);
 		exit(1);
 	}
+	
 	stream_putl(s, policy->color);
 
-	zlog_debug("zapi test");
-	struct nexthop nnh;
-	struct in6_addr test;
-	memset(&nnh,0,sizeof(nnh));
-	nnh.type = NEXTHOP_TYPE_IPV6;
-	nnh.vrf_id = 0;
-	nnh.weight = 0;
-	nnh.ifindex = 2;
-	inet_pton(AF_INET6, "1::1",
-		  &nnh.gate.ipv6);
-	inet_pton(AF_INET6, "1::1",
-		  &test);
 	stream_putc(s, 0);
 	stream_putw(s, 0); /* instance - not available */
 	stream_putc(s, 0);
@@ -155,10 +144,7 @@ static int zebra_srv6_policy_notify_update_client(struct zebra_sr_policy *policy
 	nump = stream_get_endp(s);
 	stream_putc(s, 0);
 
-	zapi_nexthop_from_nexthop(&znh, &nnh);
-	memcpy(&znh.seg6_segs, &test,
-	       sizeof(znh.seg6_segs));
-	SET_FLAG(znh.flags, ZAPI_NEXTHOP_FLAG_SEG6);
+//	zapi_nexthop_from_nexthop(&znh, policy->nhsle->nexthop);
 	ret = zapi_nexthop_encode(s, &znh, 0, message);
 	if (ret < 0){
 		goto failure;
@@ -325,7 +311,19 @@ static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
 		}
 	}
 }
+static void zebra_srv6te_nexthop(struct zebra_sr_policy *policy) {
+	struct zapi_srte_tunnel se = policy->segment_list;
+    struct in6_addr segs;
 
+
+	policy->nhsle->nexthop->type = NEXTHOP_TYPE_IPV6;
+//	policy->nhsle->nexthop->vrf_id = 0;
+//	policy->nhsle->nexthop->weight = 0;
+//	policy->nhsle->nexthop->ifindex = 2;
+//	segs = se.sid;
+//	inet_pton(AF_INET6, "1::1", &policy->nhsle->nexthop->gate.ipv6);
+//	nexthop_add_srv6_seg6(&policy->nhsle->nexthop, &segs); 
+}
 static void zebra_sr_policy_activate(struct zebra_sr_policy *policy,
 				     struct zebra_lsp *lsp)
 {
@@ -340,7 +338,7 @@ static void zebra_sr_policy_activate(struct zebra_sr_policy *policy,
 static void zebra_srv6_policy_activate(struct zebra_sr_policy *policy)
 {
 	policy->status = ZEBRA_SR_POLICY_UP;
-	zebra_srv6_policy_bsid_install(policy);
+	zebra_srv6te_nexthop(policy);
 	zsend_sr_policy_notify_status(policy->color, &policy->endpoint,
 				      policy->name, ZEBRA_SR_POLICY_UP);
 	zebra_srv6_policy_notify_update(policy);
@@ -415,7 +413,7 @@ int zebra_sr_policy_validate(struct zebra_sr_policy *policy,
 		zebra_srv6_policy_activate(policy);
 		//zebra_sr_policy_activate(policy, lsp);
 	}else{
-		zebra_sr_policy_update(policy, lsp, &old_tunnel);
+		//zebra_sr_policy_update(policy, lsp, &old_tunnel);
 		//zebra_srv6_policy_activate(policy);
 	}
 	return 0;
