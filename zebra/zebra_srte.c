@@ -29,6 +29,7 @@
 #include "zebra/zapi_msg.h"
 
 DEFINE_MTYPE_STATIC(ZEBRA, ZEBRA_SR_POLICY, "SR Policy");
+DEFINE_MTYPE_STATIC(ZEBRA, ZEBRA_SR_POLICY_NEXTHOP, "SRV6 Policy");
 
 static void zebra_sr_policy_deactivate(struct zebra_sr_policy *policy);
 
@@ -137,14 +138,24 @@ static int zebra_srv6_policy_notify_update_client(struct zebra_sr_policy *policy
 	
 	stream_putl(s, policy->color);
 
-	stream_putc(s, 0);
+//	stream_putc(s, 0);
 	stream_putw(s, 0); /* instance - not available */
 	stream_putc(s, 0);
 	stream_putl(s, 20); /* metric - not available */
 	nump = stream_get_endp(s);
 	stream_putc(s, 0);
 
-//	zapi_nexthop_from_nexthop(&znh, policy->nhsle->nexthop);
+	struct nexthop nnh;
+	memset(&nnh, 0, sizeof(nnh));
+	nnh.type = policy->nhsle->type;
+	nnh.vrf_id = policy->nhsle->vrf_id;
+	nnh.weight = policy->nhsle->weight;
+	nnh.ifindex = policy->nhsle->ifindex;
+	nnh.gate.ipv4 = policy->nhsle->gate.ipv4;
+
+	nexthop_add_srv6_seg6(&nnh, &policy->nhsle->segs);
+
+	zapi_nexthop_from_nexthop(&znh, &nnh);
 	ret = zapi_nexthop_encode(s, &znh, 0, message);
 	if (ret < 0){
 		goto failure;
@@ -311,18 +322,19 @@ static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
 		}
 	}
 }
-static void zebra_srv6te_nexthop(struct zebra_sr_policy *policy) {
+ static void zebra_srv6te_nexthop(struct zebra_sr_policy *policy) {
+
 	struct zapi_srte_tunnel se = policy->segment_list;
+	struct nexthop nnh;
     struct in6_addr segs;
 
-
-	policy->nhsle->nexthop->type = NEXTHOP_TYPE_IPV6;
-//	policy->nhsle->nexthop->vrf_id = 0;
-//	policy->nhsle->nexthop->weight = 0;
-//	policy->nhsle->nexthop->ifindex = 2;
-//	segs = se.sid;
-//	inet_pton(AF_INET6, "1::1", &policy->nhsle->nexthop->gate.ipv6);
-//	nexthop_add_srv6_seg6(&policy->nhsle->nexthop, &segs); 
+	policy->nhsle = XCALLOC(MTYPE_ZEBRA_SR_POLICY_NEXTHOP, sizeof(struct zebra_srv6te_nexthop));
+	policy->nhsle->type = NEXTHOP_TYPE_IPV4;
+	policy->nhsle->vrf_id = 0;
+	policy->nhsle->weight = 0;
+	policy->nhsle->ifindex = 2;
+	inet_pton(AF_INET, "10.0.1.2", &policy->nhsle->gate.ipv4);
+	policy->nhsle->segs = se.sid;
 }
 static void zebra_sr_policy_activate(struct zebra_sr_policy *policy,
 				     struct zebra_lsp *lsp)
@@ -414,7 +426,7 @@ int zebra_sr_policy_validate(struct zebra_sr_policy *policy,
 		//zebra_sr_policy_activate(policy, lsp);
 	}else{
 		//zebra_sr_policy_update(policy, lsp, &old_tunnel);
-		//zebra_srv6_policy_activate(policy);
+		zebra_srv6_policy_activate(policy);
 	}
 	return 0;
 }
