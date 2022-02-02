@@ -488,7 +488,7 @@ DEFPY(srte_segment_list_segment, srte_segment_list_segment_cmd,
       "<A.B.C.D$adj_src_ipv4 A.B.C.D$adj_dst_ipv4|X:X::X:X$adj_src_ipv6 X:X::X:X$adj_dst_ipv6>"
       ">]"
       "|"
-      "[srv6$has_srv6 <X:X::X:X/M$prefix>]"
+      "[srv6$has_srv6 <X:X::X:X$prefix>]"
       ">",
       "Index\n"
       "Index Value\n"
@@ -581,6 +581,11 @@ void cli_show_srte_segment_list_segment(struct vty *vty,
 	if (yang_dnode_exists(dnode, "./sid-value")) {
 		vty_out(vty, " mpls label %s",
 			yang_dnode_get_string(dnode, "./sid-value"));
+	}
+	if (yang_dnode_exists(dnode, "./srv6sid")) {
+		struct ipaddr addr;
+			yang_dnode_get_ip(&addr, dnode, "./srv6sid");
+			vty_out(vty, " srv6 %pI6", &addr.ipaddr_v6);
 	}
 	if (yang_dnode_exists(dnode, "./nai")) {
 		struct ipaddr addr;
@@ -736,11 +741,30 @@ void cli_show_srte_policy_name(struct vty *vty, const struct lyd_node *dnode,
  */
 DEFPY(srte_policy_binding_sid,
       srte_policy_binding_sid_cmd,
-      "binding-sid (16-1048575)$label",
+      "binding-sid <[mpls$has_mpls (16-1048575)$label] " 
+      "|"
+      "[srv6$has_srv6 <X:X::X:X$prefix"
+	  ">]"
+      ">",
       "Segment Routing Policy Binding-SID\n"
-      "SR Policy Binding-SID label\n")
+      "SR Policy Binding-SID label\n"
+      "SR Policy Binding-SID sid\n"
+      "SR Policy Binding-SID sid\n"
+      "SR Policy Binding-SID sid\n")
 {
-	nb_cli_enqueue_change(vty, "./binding-sid", NB_OP_CREATE, label_str);
+	if (has_mpls != NULL){
+		nb_cli_enqueue_change(vty, "./binding-sid-mpls", NB_OP_CREATE,
+				      label_str);
+	}
+	if (has_srv6 != NULL) {
+		struct prefix prefix_cli = {};
+		char buf_prefix[INET6_ADDRSTRLEN];
+		str2prefix(prefix_str, &prefix_cli);
+		inet_ntop(AF_INET6, &prefix_cli.u.prefix6, buf_prefix,
+			  sizeof(buf_prefix));
+		nb_cli_enqueue_change(vty, "./binding-sid-srv6", NB_OP_CREATE,
+				      buf_prefix);
+	}
 
 	return nb_cli_apply_changes(vty, NULL);
 }

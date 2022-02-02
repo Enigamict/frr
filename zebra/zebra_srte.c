@@ -138,7 +138,7 @@ static int zebra_srv6_policy_notify_update_client(struct zebra_sr_policy *policy
 	
 	stream_putl(s, policy->color);
 
-//	stream_putc(s, 0);
+	stream_putc(s, 0);
 	stream_putw(s, 0); /* instance - not available */
 	stream_putc(s, 0);
 	stream_putl(s, 20); /* metric - not available */
@@ -147,13 +147,13 @@ static int zebra_srv6_policy_notify_update_client(struct zebra_sr_policy *policy
 
 	struct nexthop nnh;
 	memset(&nnh, 0, sizeof(nnh));
-	nnh.type = policy->nhsle->type;
-	nnh.vrf_id = policy->nhsle->vrf_id;
-	nnh.weight = policy->nhsle->weight;
-	nnh.ifindex = policy->nhsle->ifindex;
-	nnh.gate.ipv4 = policy->nhsle->gate.ipv4;
+	nnh.type = policy->nhse->type;
+	nnh.vrf_id = policy->nhse->vrf_id;
+	nnh.weight = policy->nhse->weight;
+	nnh.ifindex = policy->nhse->ifindex;
+	nnh.gate.ipv4 = policy->nhse->gate.ipv4;
 
-	nexthop_add_srv6_seg6(&nnh, &policy->nhsle->segs);
+	nexthop_add_srv6_seg6(&nnh, &policy->nhse->segs);
 
 	zapi_nexthop_from_nexthop(&znh, &nnh);
 	ret = zapi_nexthop_encode(s, &znh, 0, message);
@@ -328,13 +328,13 @@ static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
 	struct nexthop nnh;
     struct in6_addr segs;
 
-	policy->nhsle = XCALLOC(MTYPE_ZEBRA_SR_POLICY_NEXTHOP, sizeof(struct zebra_srv6te_nexthop));
-	policy->nhsle->type = NEXTHOP_TYPE_IPV4;
-	policy->nhsle->vrf_id = 0;
-	policy->nhsle->weight = 0;
-	policy->nhsle->ifindex = 2;
-	inet_pton(AF_INET, "10.0.1.2", &policy->nhsle->gate.ipv4);
-	policy->nhsle->segs = se.sid;
+	policy->nhse = XCALLOC(MTYPE_ZEBRA_SR_POLICY_NEXTHOP, sizeof(struct zebra_srv6te_nexthop));
+	policy->nhse->type = NEXTHOP_TYPE_IPV4;
+	policy->nhse->vrf_id = 0;
+	policy->nhse->weight = 0;
+	policy->nhse->ifindex = 2;
+	inet_pton(AF_INET, "10.0.1.2", &policy->nhse->gate.ipv4);
+	policy->nhse->segs = se.sid;
 }
 static void zebra_sr_policy_activate(struct zebra_sr_policy *policy,
 				     struct zebra_lsp *lsp)

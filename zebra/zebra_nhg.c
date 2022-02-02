@@ -1719,59 +1719,60 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 
 	if (newhop->flags & NEXTHOP_FLAG_ONLINK)
 		resolved_hop->flags |= NEXTHOP_FLAG_ONLINK;
+
 	/* Copy labels of the resolved route and the parent resolving to it */
-//	if (policy) {
-//		int i = 0;
-//
-//		/*
-//		 * Don't push the first SID if the corresponding action in the
-//		 * LFIB is POP.
-//		 */
-//		if (!newhop->nh_label || !newhop->nh_label->num_labels
-//		    || newhop->nh_label->label[0] == MPLS_LABEL_IMPLICIT_NULL)
-//			i = 1;
-//
-//		for (; i < policy->segment_list.label_num; i++)
-//			labels[num_labels++] = policy->segment_list.labels[i];
-//		label_type = policy->segment_list.type;
-//	} else if (newhop->nh_label) {
-//		for (i = 0; i < newhop->nh_label->num_labels; i++) {
-//			/* Be a bit picky about overrunning the local array */
-//			if (num_labels >= MPLS_MAX_LABELS) {
-//				if (IS_ZEBRA_DEBUG_NHG || IS_ZEBRA_DEBUG_RIB)
-//					zlog_debug("%s: too many labels in newhop %pNHv",
-//						   __func__, newhop);
-//				break;
-//			}
-//			labels[num_labels++] = newhop->nh_label->label[i];
-//		}
-//		/* Use the "outer" type */
-//		label_type = newhop->nh_label_type;
-//	
-//	if (nexthop->nh_label) {
-//		for (i = 0; i < nexthop->nh_label->num_labels; i++) {
-//			/* Be a bit picky about overrunning the local array */
-//			if (num_labels >= MPLS_MAX_LABELS) {
-//				if (IS_ZEBRA_DEBUG_NHG || IS_ZEBRA_DEBUG_RIB)
-//					zlog_debug("%s: too many labels in nexthop %pNHv",
-//						   __func__, nexthop);
-//				break;
-//			}
-//			labels[num_labels++] = nexthop->nh_label->label[i];
-//		}
-//
-//		/* If the parent has labels, use its type if
-//		 * we don't already have one.
-//		 */
-//		if (label_type == ZEBRA_LSP_NONE)
-//			label_type = nexthop->nh_label_type;
-//
-//	}
-//	}
-//
-//	if (num_labels)
-//		nexthop_add_labels(resolved_hop, label_type, num_labels,
-//				   labels);
+	if (policy) {
+		int i = 0;
+
+		/*
+		 * Don't push the first SID if the corresponding action in the
+		 * LFIB is POP.
+		 */
+		if (!newhop->nh_label || !newhop->nh_label->num_labels
+		    || newhop->nh_label->label[0] == MPLS_LABEL_IMPLICIT_NULL)
+			i = 1;
+
+		for (; i < policy->segment_list.label_num; i++)
+			labels[num_labels++] = policy->segment_list.labels[i];
+		label_type = policy->segment_list.type;
+	} else if (newhop->nh_label) {
+		for (i = 0; i < newhop->nh_label->num_labels; i++) {
+			/* Be a bit picky about overrunning the local array */
+			if (num_labels >= MPLS_MAX_LABELS) {
+				if (IS_ZEBRA_DEBUG_NHG || IS_ZEBRA_DEBUG_RIB)
+					zlog_debug("%s: too many labels in newhop %pNHv",
+						   __func__, newhop);
+				break;
+			}
+			labels[num_labels++] = newhop->nh_label->label[i];
+		}
+		/* Use the "outer" type */
+		label_type = newhop->nh_label_type;
+	}
+
+	if (nexthop->nh_label) {
+		for (i = 0; i < nexthop->nh_label->num_labels; i++) {
+			/* Be a bit picky about overrunning the local array */
+			if (num_labels >= MPLS_MAX_LABELS) {
+				if (IS_ZEBRA_DEBUG_NHG || IS_ZEBRA_DEBUG_RIB)
+					zlog_debug("%s: too many labels in nexthop %pNHv",
+						   __func__, nexthop);
+				break;
+			}
+			labels[num_labels++] = nexthop->nh_label->label[i];
+		}
+
+		/* If the parent has labels, use its type if
+		 * we don't already have one.
+		 */
+		if (label_type == ZEBRA_LSP_NONE)
+			label_type = nexthop->nh_label_type;
+	}
+
+	if (num_labels)
+		nexthop_add_labels(resolved_hop, label_type, num_labels,
+				   labels);
+
 	if (nexthop->nh_srv6) {
 		nexthop_add_srv6_seg6local(resolved_hop,
 					   nexthop->nh_srv6->seg6local_action,
@@ -1779,8 +1780,13 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 		nexthop_add_srv6_seg6(resolved_hop,
 				      &nexthop->nh_srv6->seg6_segs);
 	}
-    
+	if (newhop->nh_srv6) {
+		nexthop_add_srv6_seg6(resolved_hop,
+				      &newhop->nh_srv6->seg6_segs);
+		zlog_debug("a");
+	}
 
+	nexthop_add_srv6_seg6(resolved_hop, &newhop->nh_srv6->seg6_segs);
 	resolved_hop->rparent = nexthop;
 	_nexthop_add(&nexthop->resolved, resolved_hop);
 
@@ -2108,26 +2114,31 @@ static int nexthop_active(struct nexthop *nexthop, struct nhg_hash_entry *nhe,
 		}
 
 		policy = zebra_sr_policy_find(nexthop->srte_color, &endpoint);
-		char buf_prefix[INET6_ADDRSTRLEN];
-		inet_ntop(AF_INET6, &policy->segment_list.sid, buf_prefix, sizeof(buf_prefix));
-		zlog_debug("nhg:%s", buf_prefix);
+		struct nexthop nnh;
+		memset(&nnh, 0, sizeof(nnh));
+		nnh.type = policy->nhse->type;
+		nnh.vrf_id = policy->nhse->vrf_id;
+		nnh.weight = policy->nhse->weight;
+		nnh.ifindex = policy->nhse->ifindex;
+		nnh.gate.ipv4 = policy->nhse->gate.ipv4;
+		nexthop_add_srv6_seg6(&nnh, &policy->nhse->segs);
 		if (policy && policy->status == ZEBRA_SR_POLICY_UP) {
 			resolved = 0;
-		//	frr_each_safe (nhlfe_list, &policy->lsp->nhlfe_list,
-		//		       nhlfe) {
-		//		if (!CHECK_FLAG(nhlfe->flags,
-		//				NHLFE_FLAG_SELECTED)
-		//		    || CHECK_FLAG(nhlfe->flags,
-		//				  NHLFE_FLAG_DELETED))
-		//			continue;
-		//		SET_FLAG(nexthop->flags,
-		//			 NEXTHOP_FLAG_RECURSIVE);
-		//		nexthop_set_resolved(afi, &sigs,
-		//				     nexthop, policy);
-		//		resolved = 1;
-		//	}
-	//		if (resolved)
-	//			return 1;
+//			frr_each_safe (nhlfe_list, &policy->lsp->nhlfe_list,
+//				       nhlfe) {
+//				if (!CHECK_FLAG(nhlfe->flags,
+//						NHLFE_FLAG_SELECTED)
+//				    || CHECK_FLAG(nhlfe->flags,
+//						  NHLFE_FLAG_DELETED))
+//					continue;
+				SET_FLAG(nexthop->flags,
+					 NEXTHOP_FLAG_RECURSIVE);
+				nexthop_set_resolved(afi, &nnh,
+						     nexthop, policy);
+				resolved = 1;
+	//		}
+			if (resolved)
+				return 1;
 		}
 	}
 
