@@ -153,8 +153,6 @@ static int zebra_srv6_policy_notify_update_client(struct zebra_sr_policy *policy
 	nnh.ifindex = policy->nhse->ifindex;
 	nnh.gate.ipv4 = policy->nhse->gate.ipv4;
 
-	nexthop_add_srv6_seg6(&nnh, &policy->nhse->segs);
-
 	zapi_nexthop_from_nexthop(&znh, &nnh);
 	ret = zapi_nexthop_encode(s, &znh, 0, message);
 	if (ret < 0){

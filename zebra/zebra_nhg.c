@@ -1780,13 +1780,11 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 		nexthop_add_srv6_seg6(resolved_hop,
 				      &nexthop->nh_srv6->seg6_segs);
 	}
-	if (newhop->nh_srv6) {
+	if (!sid_zero(&newhop->nh_srv6->seg6_segs)) {
 		nexthop_add_srv6_seg6(resolved_hop,
 				      &newhop->nh_srv6->seg6_segs);
-		zlog_debug("a");
 	}
 
-	nexthop_add_srv6_seg6(resolved_hop, &newhop->nh_srv6->seg6_segs);
 	resolved_hop->rparent = nexthop;
 	_nexthop_add(&nexthop->resolved, resolved_hop);
 
