@@ -44,7 +44,7 @@ struct zebra_sr_policy {
 	enum zebra_sr_policy_status status;
 	struct zapi_srte_tunnel segment_list;
 	struct zebra_lsp *lsp;
-	struct zebra_srv6te_nexthop *nhsle;
+	struct zebra_srv6te_nexthop *nhse;
 	struct zebra_vrf *zvrf;
 };
 RB_HEAD(zebra_sr_policy_instance_head, zebra_sr_policy);
@@ -54,6 +54,9 @@ RB_PROTOTYPE(zebra_sr_policy_instance_head, zebra_sr_policy, entry,
 extern struct zebra_sr_policy_instance_head zebra_sr_policy_instances;
 
 struct zebra_srv6te_nexthop {
+
+	uint8_t srv6type;
+
 	ifindex_t ifindex;
 
 	vrf_id_t vrf_id;
@@ -67,6 +70,8 @@ struct zebra_srv6te_nexthop {
 
 	uint8_t weight;
 
+	uint8_t seg_num;
+
 	struct in6_addr segs;
 };
 struct zebra_sr_policy *
@@ -78,7 +83,7 @@ struct zebra_sr_policy *zebra_sr_policy_find_by_name(char *name);
 int zebra_sr_policy_validate(struct zebra_sr_policy *policy,
 			     struct zapi_srte_tunnel *new_tunnel);
 int zebra_sr_policy_bsid_install(struct zebra_sr_policy *policy);
-int zebra_srv6_policy_bsid_install(struct zebra_sr_policy *policy);
+void zebra_srv6_policy_bsid_install();
 void zebra_sr_policy_bsid_uninstall(struct zebra_sr_policy *policy,
 				    mpls_label_t old_bsid);
 void zebra_srte_init(void);

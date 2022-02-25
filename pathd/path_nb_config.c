@@ -172,6 +172,8 @@ int pathd_srte_segment_list_segment_srv6_modify(
 	segment = nb_running_get_entry(args->dnode, NULL, true);
 	yang_dnode_get_ipv6(&sid, args->dnode, NULL);
 	segment->sid = sid;
+	segment->sid_num = 0;
+
 	SET_FLAG(segment->segment_list->flags, F_SEGMENT_LIST_MODIFIED);
 
 	return NB_OK;
@@ -383,19 +385,11 @@ int pathd_srte_policy_binding_sid_srv6_modify(struct nb_cb_modify_args *args)
 
 	struct in6_addr sid;
 
+	policy = nb_running_get_entry(args->dnode, NULL, true);
 	yang_dnode_get_ipv6(&sid, args->dnode, NULL);
-	zlog_debug("a");
-
-	switch (args->event) {
-	case NB_EV_VALIDATE:
-		break;
-	case NB_EV_APPLY:
-		policy = nb_running_get_entry(args->dnode, NULL, true);
-		policy->binding_sid_srv6 = sid;
-		SET_FLAG(policy->flags, F_POLICY_MODIFIED);
-		break;
-	}
-
+	policy->binding_sid_srv6 = sid;
+	SET_FLAG(policy->flags, F_POLICY_MODIFIED);
+	
 	return NB_OK;
 }
 int pathd_srte_policy_binding_sid_destroy(struct nb_cb_destroy_args *args)

@@ -743,27 +743,25 @@ DEFPY(srte_policy_binding_sid,
       srte_policy_binding_sid_cmd,
       "binding-sid <[mpls$has_mpls (16-1048575)$label] " 
       "|"
-      "[srv6$has_srv6 <X:X::X:X$prefix"
-	  ">]"
+      "[srv6$has_srv6 <X:X::X:X$prefix>]"
       ">",
       "Segment Routing Policy Binding-SID\n"
       "SR Policy Binding-SID label\n"
-      "SR Policy Binding-SID sid\n"
-      "SR Policy Binding-SID sid\n"
-      "SR Policy Binding-SID sid\n")
+      "SR Policy Binding-SID sid")
 {
+
 	if (has_mpls != NULL){
 		nb_cli_enqueue_change(vty, "./binding-sid-mpls", NB_OP_CREATE,
 				      label_str);
 	}
 	if (has_srv6 != NULL) {
 		struct prefix prefix_cli = {};
-		char buf_prefix[INET6_ADDRSTRLEN];
+		char buf_prefix1[INET6_ADDRSTRLEN];
 		str2prefix(prefix_str, &prefix_cli);
-		inet_ntop(AF_INET6, &prefix_cli.u.prefix6, buf_prefix,
-			  sizeof(buf_prefix));
-		nb_cli_enqueue_change(vty, "./binding-sid-srv6", NB_OP_CREATE,
-				      buf_prefix);
+		inet_ntop(AF_INET6, &prefix_cli.u.prefix6, buf_prefix1,
+			  sizeof(buf_prefix1));
+		nb_cli_enqueue_change(vty, "./binding-sid-srv6", NB_OP_MODIFY,
+				      prefix_str);
 	}
 
 	return nb_cli_apply_changes(vty, NULL);
@@ -784,8 +782,20 @@ DEFPY(srte_policy_no_binding_sid,
 void cli_show_srte_policy_binding_sid(struct vty *vty,
 				      const struct lyd_node *dnode,
 				      bool show_defaults)
-{
-	vty_out(vty, "   binding-sid %s\n", yang_dnode_get_string(dnode, NULL));
+{	
+	if (yang_dnode_exists(dnode, "./binding-sid-srv6")) {
+		struct ipaddr addr;
+		zlog_debug("tests");
+		yang_dnode_get_ip(&addr, dnode, "./binding-sid-srv6");
+		vty_out(vty, "  binding-sid srv6 %pI6", &addr.ipaddr_v6);
+	}else{
+		vty_out(vty, "   binding-sid mpls %s\n",
+			yang_dnode_get_string(dnode, NULL));
+		struct ipaddr addr;
+		zlog_debug("tests");
+		yang_dnode_get_ip(&addr, dnode, "./binding-sid-srv6");
+		vty_out(vty, "  binding-sid srv6 %pI6", &addr.ipaddr_v6);
+	}
 }
 
 /*

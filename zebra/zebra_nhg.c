@@ -1661,7 +1661,9 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 {
 	struct nexthop *resolved_hop;
 	uint8_t num_labels = 0;
+	uint8_t num_segs = 0;
 	mpls_label_t labels[MPLS_MAX_LABELS];
+	struct in6_addr segs[256];
 	enum lsp_types_t label_type = ZEBRA_LSP_NONE;
 	int i = 0;
 
@@ -1723,7 +1725,6 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 	/* Copy labels of the resolved route and the parent resolving to it */
 	if (policy) {
 		int i = 0;
-
 		/*
 		 * Don't push the first SID if the corresponding action in the
 		 * LFIB is POP.
@@ -1769,6 +1770,13 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 			label_type = nexthop->nh_label_type;
 	}
 
+//	if(!sid_zero(&policy->segment_list.sid[0])) {
+//		int j = 0;
+//		for (; j < policy->segment_list.num_seg; j++)
+//			segs[num_segs++] = policy->segment_list.sid[j];
+//	}
+//
+
 	if (num_labels)
 		nexthop_add_labels(resolved_hop, label_type, num_labels,
 				   labels);
@@ -1779,10 +1787,6 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 					   &nexthop->nh_srv6->seg6local_ctx);
 		nexthop_add_srv6_seg6(resolved_hop,
 				      &nexthop->nh_srv6->seg6_segs);
-	}
-	if (!sid_zero(&newhop->nh_srv6->seg6_segs)) {
-		nexthop_add_srv6_seg6(resolved_hop,
-				      &newhop->nh_srv6->seg6_segs);
 	}
 
 	resolved_hop->rparent = nexthop;
@@ -2119,7 +2123,6 @@ static int nexthop_active(struct nexthop *nexthop, struct nhg_hash_entry *nhe,
 		nnh.weight = policy->nhse->weight;
 		nnh.ifindex = policy->nhse->ifindex;
 		nnh.gate.ipv4 = policy->nhse->gate.ipv4;
-		nexthop_add_srv6_seg6(&nnh, &policy->nhse->segs);
 		if (policy && policy->status == ZEBRA_SR_POLICY_UP) {
 			resolved = 0;
 //			frr_each_safe (nhlfe_list, &policy->lsp->nhlfe_list,
