@@ -1666,6 +1666,7 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 	struct in6_addr segs[256];
 	enum lsp_types_t label_type = ZEBRA_LSP_NONE;
 	int i = 0;
+	int j = 0;
 
 	resolved_hop = nexthop_new();
 	SET_FLAG(resolved_hop->flags, NEXTHOP_FLAG_ACTIVE);
@@ -1770,12 +1771,13 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 			label_type = nexthop->nh_label_type;
 	}
 
-//	if(!sid_zero(&policy->segment_list.sid[0])) {
-//		int j = 0;
-//		for (; j < policy->segment_list.num_seg; j++)
-//			segs[num_segs++] = policy->segment_list.sid[j];
-//	}
-//
+	if(!sid_zero(&policy->segment_list.sid[0])) {
+		for (j = 0; j < policy->segment_list.num_seg; j++)
+			segs[num_segs++] = policy->segment_list.sid[j];
+		nexthop_add_srv6_seg6(resolved_hop,
+				      &segs[1]);
+	}
+
 
 	if (num_labels)
 		nexthop_add_labels(resolved_hop, label_type, num_labels,
