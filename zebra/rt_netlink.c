@@ -79,6 +79,7 @@
 #include "zebra/zebra_vxlan.h"
 #include "zebra/zebra_errors.h"
 #include "zebra/zebra_evpn_mh.h"
+#include "zebra/zebra_srte.h"
 
 #ifndef AF_MPLS
 #define AF_MPLS 28
@@ -1336,6 +1337,36 @@ static bool _netlink_route_encode_nexthop_src(const struct nexthop *nexthop,
 	return true;
 }
 
+static ssize_t fill_multiseg6ipt_encap(char *buffer, size_t buflen,
+				  const struct in6_addr *seg, uint8_t num_segs)
+{
+	struct seg6_iptunnel_encap *ipt;
+	struct ipv6_sr_hdr *srh;
+	const size_t srhlen = 8 + sizeof(struct in6_addr)*num_segs;
+
+	if (buflen < (sizeof(struct seg6_iptunnel_encap) +
+		      sizeof(struct ipv6_sr_hdr) + 16))
+		return -1;
+
+	memset(buffer, 0, buflen);
+	size_t srh_idx = 0;
+
+	ipt = (struct seg6_iptunnel_encap *)buffer;
+	ipt->mode = SEG6_IPTUN_MODE_ENCAP;
+	srh = ipt->srh;
+	srh->hdrlen = (srhlen >> 3) - 1;
+	srh->type = 4;
+	srh->segments_left = num_segs - 1;
+	srh->first_segment = num_segs - 1;
+	for (ssize_t i = num_segs - 1; i >= 0; i--) {
+		memcpy(&srh->segments[srh_idx + i], &seg[num_segs - 1 - i],
+		       sizeof(struct in6_addr));
+	}
+
+	return srhlen + 4;
+
+}
+
 static ssize_t fill_seg6ipt_encap(char *buffer, size_t buflen,
 				  const struct in6_addr *seg)
 {
@@ -1365,9 +1396,11 @@ static ssize_t fill_seg6ipt_encap(char *buffer, size_t buflen,
 	srh->type = 4;
 	srh->segments_left = 0;
 	srh->first_segment = 0;
-	memcpy(&srh->segments[0], seg, sizeof(struct in6_addr));
+	memcpy(&srh->segments[0], &seg,
+	       sizeof(struct in6_addr));
 
 	return srhlen + 4;
+
 }
 
 /* This function takes a nexthop as argument and adds
@@ -1480,6 +1513,17 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 			char tun_buf[4096];
 			ssize_t tun_len;
 			struct rtattr *nest;
+			struct ipaddr endpoint = {0};
+			struct in_addr test;
+			struct zebra_sr_policy *policy;
+			endpoint.ipa_type = IPADDR_V4;
+			inet_pton(AF_INET, "6.6.6.6",
+				  &test);
+			endpoint.ipaddr_v4 = test;	
+
+			policy = zebra_sr_policy_find(1,
+						      &endpoint);
+			zlog_debug("policy:%d", policy->nhse->ifindex);
 
 			if (!nl_attr_put16(nlmsg, req_size, RTA_ENCAP_TYPE,
 					  LWTUNNEL_ENCAP_SEG6))
@@ -1487,8 +1531,8 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 			nest = nl_attr_nest(nlmsg, req_size, RTA_ENCAP);
 			if (!nest)
 				return false;
-			tun_len = fill_seg6ipt_encap(tun_buf, sizeof(tun_buf),
-					&nexthop->nh_srv6->seg6_segs);
+			tun_len = fill_multiseg6ipt_encap(tun_buf, sizeof(tun_buf),
+					policy->segment_list.sid,policy->segment_list.num_seg);
 			if (tun_len < 0)
 				return false;
 			if (!nl_attr_put(nlmsg, req_size, SEG6_IPTUNNEL_SRH,
@@ -2582,6 +2626,7 @@ ssize_t netlink_nexthop_msg_encode(uint16_t cmd,
 					char tun_buf[4096];
 					ssize_t tun_len;
 					struct rtattr *nest;
+					zlog_debug("aaaa");
 
 					if (!nl_attr_put16(&req->n, buflen,
 					    NHA_ENCAP_TYPE,
