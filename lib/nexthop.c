@@ -97,6 +97,10 @@ static int _nexthop_srv6_cmp(const struct nexthop *nh1,
 		     &nh2->nh_srv6->seg6_segs,
 		     sizeof(struct in6_addr));
 
+	ret = memcmp(&nh1->nh_srv6->seg6_multisegs,
+		     &nh2->nh_srv6->seg6_multisegs,
+		     sizeof(struct in6_addr));
+
 	return ret;
 }
 
@@ -589,6 +593,14 @@ void nexthop_del_srv6_seg6local(struct nexthop *nexthop)
 		XFREE(MTYPE_NH_SRV6, nexthop->nh_srv6);
 }
 
+void nexthop_add_srv6_policy(struct nexthop *nexthop, uint8_t color, 
+							struct ipaddr *endpoint) 
+{
+	if (!nexthop->nh_srv6)
+		nexthop->nh_srv6 =
+			XCALLOC(MTYPE_NH_SRV6, sizeof(struct nexthop_srv6));
+}
+
 void nexthop_add_srv6_seg6(struct nexthop *nexthop,
 			   const struct in6_addr *segs)
 {
@@ -600,6 +612,23 @@ void nexthop_add_srv6_seg6(struct nexthop *nexthop,
 					   sizeof(struct nexthop_srv6));
 
 	nexthop->nh_srv6->seg6_segs = *segs;
+}
+void nexthop_add_srv6_multiseg6(struct nexthop *nexthop, uint8_t num_segs,
+			   const struct in6_addr *segs)
+{
+	int j = 0;
+	
+	if (!segs)
+		return;
+
+	if (!nexthop->nh_srv6)
+		nexthop->nh_srv6 = XCALLOC(MTYPE_NH_SRV6,
+					   sizeof(struct nexthop_srv6));
+
+	for (j = 0; j < num_segs; j++) {
+		nexthop->nh_srv6->seg6_multisegs[j] = segs[j];
+	}
+	nexthop->nh_srv6->num_segs = num_segs;
 }
 
 void nexthop_del_srv6_seg6(struct nexthop *nexthop)
@@ -763,6 +792,8 @@ uint32_t nexthop_hash_quick(const struct nexthop *nexthop)
 			    sizeof(nexthop->nh_srv6->seg6local_ctx), key);
 		key = jhash(&nexthop->nh_srv6->seg6_segs,
 			    sizeof(nexthop->nh_srv6->seg6_segs), key);
+		key = jhash(&nexthop->nh_srv6->seg6_multisegs,
+			    sizeof(nexthop->nh_srv6->seg6_multisegs), key);
 	}
 
 	return key;
@@ -826,7 +857,10 @@ void nexthop_copy_no_recurse(struct nexthop *copy,
 				&nexthop->nh_srv6->seg6local_ctx);
 		if (!sid_zero(&nexthop->nh_srv6->seg6_segs))
 			nexthop_add_srv6_seg6(copy,
-				&nexthop->nh_srv6->seg6_segs);
+					      &nexthop->nh_srv6->seg6_segs);
+		if (!sid_zero(nexthop->nh_srv6->seg6_multisegs))
+			nexthop_add_srv6_multiseg6(copy,nexthop->nh_srv6->num_segs,
+					      nexthop->nh_srv6->seg6_multisegs);
 	}
 }
 

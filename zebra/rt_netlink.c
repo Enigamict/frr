@@ -1396,8 +1396,7 @@ static ssize_t fill_seg6ipt_encap(char *buffer, size_t buflen,
 	srh->type = 4;
 	srh->segments_left = 0;
 	srh->first_segment = 0;
-	memcpy(&srh->segments[0], &seg,
-	       sizeof(struct in6_addr));
+	memcpy(&srh->segments[0], seg, sizeof(struct in6_addr));
 
 	return srhlen + 4;
 
@@ -1439,6 +1438,7 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 		return false;
 
 	if (nexthop->nh_srv6) {
+		zlog_debug("a");
 		if (nexthop->nh_srv6->seg6local_action !=
 		    ZEBRA_SEG6_LOCAL_ACTION_UNSPEC) {
 			struct rtattr *nest;
@@ -1508,22 +1508,31 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 			}
 			nl_attr_nest_end(nlmsg, nest);
 		}
-
 		if (!sid_zero(&nexthop->nh_srv6->seg6_segs)) {
 			char tun_buf[4096];
 			ssize_t tun_len;
 			struct rtattr *nest;
-			struct ipaddr endpoint = {0};
-			struct in_addr test;
-			struct zebra_sr_policy *policy;
-			endpoint.ipa_type = IPADDR_V4;
-			inet_pton(AF_INET, "6.6.6.6",
-				  &test);
-			endpoint.ipaddr_v4 = test;	
 
-			policy = zebra_sr_policy_find(1,
-						      &endpoint);
-			zlog_debug("policy:%d", policy->nhse->ifindex);
+			if (!nl_attr_put16(nlmsg, req_size, RTA_ENCAP_TYPE,
+					  LWTUNNEL_ENCAP_SEG6))
+				return false;
+			nest = nl_attr_nest(nlmsg, req_size, RTA_ENCAP);
+			if (!nest)
+				return false;
+			tun_len = fill_seg6ipt_encap(tun_buf, sizeof(tun_buf),
+					&nexthop->nh_srv6->seg6_segs);
+			if (tun_len < 0)
+				return false;
+			if (!nl_attr_put(nlmsg, req_size, SEG6_IPTUNNEL_SRH,
+					 tun_buf, tun_len))
+				return false;
+			nl_attr_nest_end(nlmsg, nest);
+		}
+
+		if (!sid_zero(nexthop->nh_srv6->seg6_multisegs)) {
+			char tun_buf[4096];
+			ssize_t tun_len;
+			struct rtattr *nest;
 
 			if (!nl_attr_put16(nlmsg, req_size, RTA_ENCAP_TYPE,
 					  LWTUNNEL_ENCAP_SEG6))
@@ -1532,7 +1541,8 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 			if (!nest)
 				return false;
 			tun_len = fill_multiseg6ipt_encap(tun_buf, sizeof(tun_buf),
-					policy->segment_list.sid,policy->segment_list.num_seg);
+					nexthop->nh_srv6->seg6_multisegs,
+					nexthop->nh_srv6->num_segs);
 			if (tun_len < 0)
 				return false;
 			if (!nl_attr_put(nlmsg, req_size, SEG6_IPTUNNEL_SRH,
@@ -1540,7 +1550,7 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 				return false;
 			nl_attr_nest_end(nlmsg, nest);
 		}
-	}
+    }
 
 	if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK))
 		rtmsg->rtm_flags |= RTNH_F_ONLINK;
@@ -2061,8 +2071,9 @@ ssize_t netlink_route_multipath_msg_encode(int cmd,
 	 */
 	nexthop = dplane_ctx_get_ng(ctx)->nexthop;
 	if (nexthop) {
-		if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_RECURSIVE))
+		if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_RECURSIVE)){
 			nexthop = nexthop->resolved;
+		}
 
 		if (nexthop->type == NEXTHOP_TYPE_BLACKHOLE) {
 			switch (nexthop->bh_type) {

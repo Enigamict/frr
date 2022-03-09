@@ -1772,10 +1772,10 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 	}
 
 	if(!sid_zero(&policy->segment_list.sid[0])) {
-		for (j = 0; j < policy->segment_list.num_seg; j++)
+		for (j = 0; j < policy->segment_list.num_seg; j++){
 			segs[num_segs++] = policy->segment_list.sid[j];
-		nexthop_add_srv6_seg6(resolved_hop,
-				      &segs[1]);
+		}
+		nexthop_add_srv6_multiseg6(resolved_hop, num_segs, segs);
 	}
 
 

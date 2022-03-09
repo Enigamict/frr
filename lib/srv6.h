@@ -124,6 +124,8 @@ struct nexthop_srv6 {
 
 	/* SRv6 Headend-behaviour */
 	struct in6_addr seg6_segs;
+	struct in6_addr seg6_multisegs[256];
+	uint8_t num_segs;
 };
 
 static inline const char *seg6_mode2str(enum seg6_mode_t mode)

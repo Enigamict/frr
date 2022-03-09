@@ -166,7 +166,11 @@ void nexthop_add_srv6_seg6local(struct nexthop *nexthop, uint32_t action,
 void nexthop_del_srv6_seg6local(struct nexthop *nexthop);
 void nexthop_add_srv6_seg6(struct nexthop *nexthop,
 			   const struct in6_addr *segs);
+void nexthop_add_srv6_multiseg6(struct nexthop *nexthop,uint8_t num_segs,
+			   const struct in6_addr *segs);
 void nexthop_del_srv6_seg6(struct nexthop *nexthop);
+void nexthop_add_srv6_policy(struct nexthop *nexthop, uint8_t color, 
+							struct ipaddr *endpoint);
 
 /*
  * Allocate a new nexthop object and initialize it from various args.
