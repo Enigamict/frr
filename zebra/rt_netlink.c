@@ -1342,14 +1342,13 @@ static ssize_t fill_multiseg6ipt_encap(char *buffer, size_t buflen,
 {
 	struct seg6_iptunnel_encap *ipt;
 	struct ipv6_sr_hdr *srh;
-	const size_t srhlen = 8 + sizeof(struct in6_addr)*num_segs;
+	const size_t srhlen = 8 + 16 * num_segs;
 
-	if (buflen < (sizeof(struct seg6_iptunnel_encap) +
-		      sizeof(struct ipv6_sr_hdr) + 16))
+	if (buflen < (sizeof(struct seg6_iptunnel_encap)
+		      + sizeof(struct ipv6_sr_hdr) + 16))
 		return -1;
 
 	memset(buffer, 0, buflen);
-	size_t srh_idx = 0;
 
 	ipt = (struct seg6_iptunnel_encap *)buffer;
 	ipt->mode = SEG6_IPTUN_MODE_ENCAP;
@@ -1358,8 +1357,9 @@ static ssize_t fill_multiseg6ipt_encap(char *buffer, size_t buflen,
 	srh->type = 4;
 	srh->segments_left = num_segs - 1;
 	srh->first_segment = num_segs - 1;
-	for (ssize_t i = num_segs - 1; i >= 0; i--) {
-		memcpy(&srh->segments[srh_idx + i], &seg[num_segs - 1 - i],
+
+	for (ssize_t i = srh->first_segment; i >= 0; i--) {
+		memcpy(&srh->segments[i], &seg[num_segs - 1 - i],
 		       sizeof(struct in6_addr));
 	}
 
