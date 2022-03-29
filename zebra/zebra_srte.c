@@ -27,6 +27,9 @@
 #include "zebra/zebra_mpls.h"
 #include "zebra/zebra_rnh.h"
 #include "zebra/zapi_msg.h"
+#include "zebra/zebra_vrf.h"
+
+#include "table.h"
 
 DEFINE_MTYPE_STATIC(ZEBRA, ZEBRA_SR_POLICY, "SR Policy");
 DEFINE_MTYPE_STATIC(ZEBRA, ZEBRA_SR_POLICY_NEXTHOP, "SRV6 Policy");
@@ -150,8 +153,6 @@ static int zebra_srv6_policy_notify_update_client(struct zebra_sr_policy *policy
 	nnh.type = policy->nhse->type;
 	nnh.vrf_id = policy->nhse->vrf_id;
 	nnh.weight = policy->nhse->weight;
-	nnh.ifindex = policy->nhse->ifindex;
-	nnh.gate.ipv4 = policy->nhse->gate.ipv4;
 
 	zapi_nexthop_from_nexthop(&znh, &nnh);
 	ret = zapi_nexthop_encode(s, &znh, 0, message);
@@ -320,16 +321,49 @@ static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
 		}
 	}
 }
- static void zebra_srv6te_nexthop(struct zebra_sr_policy *policy) {
+ static void zebra_srv6te_nexthop(struct zebra_sr_policy *policy) 
+ {
 
-	struct zapi_srte_tunnel se = policy->segment_list;
+	struct route_node *rn;
+	struct route_entry *re;
+	struct route_table *table = NULL;
+	struct zebra_vrf *zvrf = NULL;
+	struct prefix_ipv6 sidmask;
+	const struct nexthop_group *nhg;
+	const struct nexthop *nexthop;
+	afi_t afi = 2;
+	safi_t safi = 1;
+	char buf[SRCDEST2STR_BUFFER];
 
-	policy->nhse = XCALLOC(MTYPE_ZEBRA_SR_POLICY_NEXTHOP, sizeof(struct zebra_srv6te_nexthop));
+	char buf_prefix[INET6_ADDRSTRLEN];
+//	inet_ntop(AF_INET6, &policy->segment_list.sid[0], buf_prefix,
+//			  sizeof(buf_prefix));
+//	zlog_debug("mask:%s", buf_prefix);
+
+	sidmask.family = AF_INET6;
+	sidmask.prefix = policy->segment_list.sid[0];
+	sidmask.prefixlen = 64;
+	apply_mask_ipv6(&sidmask);
+	inet_ntop(AF_INET6, &sidmask.prefix, buf_prefix,
+			  sizeof(buf_prefix));
+	zlog_debug("mask:%s", buf_prefix);
+
+	table = zebra_vrf_table(afi, safi, zvrf_id(zvrf));
+	zlog_debug("%ld", table->count);
+	for (rn = route_top(table); rn; rn = srcdest_route_next(rn)) {
+		RNODE_FOREACH_RE (rn, re) {
+			nhg = rib_get_fib_nhg(re);
+			for (ALL_NEXTHOPS_PTR(nhg, nexthop)) {
+				zlog_debug("%d", nexthop->ifindex);
+			}
+		}
+	}
+	policy->nhse = XCALLOC(MTYPE_ZEBRA_SR_POLICY_NEXTHOP,
+			       sizeof(struct zebra_srv6te_nexthop));
 	policy->nhse->type = NEXTHOP_TYPE_IPV4;
 	policy->nhse->vrf_id = 0;
 	policy->nhse->weight = 0;
 	policy->nhse->ifindex = 2;
-	inet_pton(AF_INET, "10.0.1.2", &policy->nhse->gate.ipv4);
 }
 static void zebra_sr_policy_activate(struct zebra_sr_policy *policy,
 				     struct zebra_lsp *lsp)
@@ -420,51 +454,6 @@ int zebra_sr_policy_validate(struct zebra_sr_policy *policy,
 		//zebra_sr_policy_update(policy, lsp, &old_tunnel);
 		zebra_srv6_policy_activate(policy);
 	}
-	return 0;
-}
-
-void zebra_srv6_policy_bsid_install()
-{
-	struct zapi_route api;
-	struct zapi_nexthop *api_nh;
-	struct nexthop nh;
-	struct prefix prefix;
-	struct zclient *zclient = NULL;
-	struct in6_addr test;
-
-	memset(&api, 0, sizeof(api));
-	memset(&prefix, 0, sizeof(prefix));
-	memset(&nh, 0, sizeof(nh));
-
-	prefix.family = AF_INET6;
-	prefix.prefixlen = IPV6_MAX_BITLEN;
-	inet_pton(AF_INET6, "9::9", &prefix.u.prefix6);
-	inet_pton(AF_INET6, "1::1", &test);
-
-	api.vrf_id = 0;
-	api.type = ZEBRA_ROUTE_KERNEL;
-	api.instance = 0;
-	api.safi = SAFI_UNICAST;
-	memcpy(&api.prefix, &prefix, sizeof(prefix));
-	api.flags = 0;
-	SET_FLAG(api.flags, ZEBRA_FLAG_ALLOW_RECURSION);
-	SET_FLAG(api.message, ZAPI_MESSAGE_NEXTHOP);
-
-	nh.type = NEXTHOP_TYPE_IPV6;
-	inet_pton(AF_INET, "10.0.1.2", &nh.gate.ipv4);
-	nh.vrf_id = 0;
-
-	api.nexthop_num = 1;
-
-	nexthop_add_srv6_seg6(&nh, &test);
-	int i;
-	for (i = 0; i < api.nexthop_num; i++) {
-		api_nh = &api.nexthops[i];
-		zapi_nexthop_from_nexthop(&api_nh, &nh);
-	}
-
-	zclient_route_send(ZEBRA_ROUTE_ADD, zclient, &api);
-
 	return 0;
 }
 

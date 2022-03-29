@@ -1427,6 +1427,7 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 	char label_buf[256];
 	struct vrf *vrf;
 	char addrstr[INET6_ADDRSTRLEN];
+	zlog_debug("net");
 
 	assert(nexthop);
 
@@ -1438,7 +1439,7 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 		return false;
 
 	if (nexthop->nh_srv6) {
-		zlog_debug("a");
+		zlog_debug("test");
 		if (nexthop->nh_srv6->seg6local_action !=
 		    ZEBRA_SEG6_LOCAL_ACTION_UNSPEC) {
 			struct rtattr *nest;
@@ -1512,6 +1513,7 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 			char tun_buf[4096];
 			ssize_t tun_len;
 			struct rtattr *nest;
+			zlog_debug("test1");
 
 			if (!nl_attr_put16(nlmsg, req_size, RTA_ENCAP_TYPE,
 					  LWTUNNEL_ENCAP_SEG6))
@@ -2637,7 +2639,7 @@ ssize_t netlink_nexthop_msg_encode(uint16_t cmd,
 					char tun_buf[4096];
 					ssize_t tun_len;
 					struct rtattr *nest;
-					zlog_debug("aaaa");
+					zlog_debug("aaaaaaa");
 
 					if (!nl_attr_put16(&req->n, buflen,
 					    NHA_ENCAP_TYPE,
@@ -2650,6 +2652,31 @@ ssize_t netlink_nexthop_msg_encode(uint16_t cmd,
 					tun_len = fill_seg6ipt_encap(tun_buf,
 					    sizeof(tun_buf),
 					    &nh->nh_srv6->seg6_segs);
+					if (tun_len < 0)
+						return 0;
+					if (!nl_attr_put(&req->n, buflen,
+							 SEG6_IPTUNNEL_SRH,
+							 tun_buf, tun_len))
+						return 0;
+					nl_attr_nest_end(&req->n, nest);
+				}
+				if (!sid_zero(nh->nh_srv6->seg6_multisegs)) {
+					char tun_buf[4096];
+					ssize_t tun_len;
+					struct rtattr *nest;
+
+					if (!nl_attr_put16(&req->n, buflen,
+					    NHA_ENCAP_TYPE,
+					    LWTUNNEL_ENCAP_SEG6))
+						return 0;
+					nest = nl_attr_nest(&req->n, buflen,
+					    NHA_ENCAP | NLA_F_NESTED);
+					if (!nest)
+						return 0;
+					tun_len = fill_multiseg6ipt_encap(tun_buf,
+					    sizeof(tun_buf),
+					    nh->nh_srv6->seg6_multisegs,
+						nh->nh_srv6->num_segs);
 					if (tun_len < 0)
 						return 0;
 					if (!nl_attr_put(&req->n, buflen,
