@@ -37,13 +37,16 @@ def build_topo(tgen):
     switch = tgen.add_switch("s1")
     switch.add_link(tgen.gears["rt1"], nodeif="eth-sw1")
     switch.add_link(tgen.gears["rt2"], nodeif="eth-sw1")
-    switch.add_link(tgen.gears["rt3"], nodeif="eth-sw1")
 
     switch = tgen.add_switch("s2")
+    switch.add_link(tgen.gears["rt1"], nodeif="eth-sw2")
+    switch.add_link(tgen.gears["rt3"], nodeif="eth-sw2")
+
+    switch = tgen.add_switch("s3")
     switch.add_link(tgen.gears["rt2"], nodeif="eth-rt2")
     switch.add_link(tgen.gears["rt4"], nodeif="eth-rt4-1")
 
-    switch = tgen.add_switch("s3")
+    switch = tgen.add_switch("s4")
     switch.add_link(tgen.gears["rt3"], nodeif="eth-rt3")
     switch.add_link(tgen.gears["rt4"], nodeif="eth-rt4-2")
 
