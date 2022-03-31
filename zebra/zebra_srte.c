@@ -331,6 +331,8 @@ static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
 	struct prefix_ipv6 sidmask;
 	const struct nexthop_group *nhg;
 	const struct nexthop *nexthop;
+	struct in6_addr sid_res;
+	ifindex_t if_index;
 	afi_t afi = 2;
 	safi_t safi = 1;
 	char buf[SRCDEST2STR_BUFFER];
@@ -347,6 +349,9 @@ static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
 	inet_ntop(AF_INET6, &sidmask.prefix, buf_prefix,
 			  sizeof(buf_prefix));
 	zlog_debug("mask:%s", buf_prefix);
+	char cmp1[64];
+	strcat(buf_prefix,"/64");
+	zlog_debug("sn:%s", buf_prefix);
 
 	table = zebra_vrf_table(afi, safi, zvrf_id(zvrf));
 	zlog_debug("%ld", table->count);
@@ -355,6 +360,11 @@ static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
 			nhg = rib_get_fib_nhg(re);
 			for (ALL_NEXTHOPS_PTR(nhg, nexthop)) {
 				zlog_debug("%d", nexthop->ifindex);
+				zlog_debug("%s", buf_prefix);
+				if (!strcmp(srcdest_rnode2str(rn, buf, sizeof(buf)),buf_prefix)){
+					zlog_debug("match");
+					if_index = nexthop->ifindex;
+				}
 			}
 		}
 	}
@@ -363,7 +373,7 @@ static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
 	policy->nhse->type = NEXTHOP_TYPE_IPV4;
 	policy->nhse->vrf_id = 0;
 	policy->nhse->weight = 0;
-	policy->nhse->ifindex = 2;
+	policy->nhse->ifindex = if_index;
 }
 static void zebra_sr_policy_activate(struct zebra_sr_policy *policy,
 				     struct zebra_lsp *lsp)
