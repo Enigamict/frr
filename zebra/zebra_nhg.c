@@ -1661,9 +1661,12 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 {
 	struct nexthop *resolved_hop;
 	uint8_t num_labels = 0;
+	uint8_t num_segs = 0;
 	mpls_label_t labels[MPLS_MAX_LABELS];
+	struct in6_addr segs[256];
 	enum lsp_types_t label_type = ZEBRA_LSP_NONE;
 	int i = 0;
+	int j = 0;
 
 	resolved_hop = nexthop_new();
 	SET_FLAG(resolved_hop->flags, NEXTHOP_FLAG_ACTIVE);
@@ -1723,7 +1726,6 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 	/* Copy labels of the resolved route and the parent resolving to it */
 	if (policy) {
 		int i = 0;
-
 		/*
 		 * Don't push the first SID if the corresponding action in the
 		 * LFIB is POP.
@@ -1768,6 +1770,14 @@ static struct nexthop *nexthop_set_resolved(afi_t afi,
 		if (label_type == ZEBRA_LSP_NONE)
 			label_type = nexthop->nh_label_type;
 	}
+
+	if(!sid_zero(&policy->segment_list.sid[0])) {
+		for (j = 0; j < policy->segment_list.num_seg; j++){
+			segs[num_segs++] = policy->segment_list.sid[j];
+		}
+		nexthop_add_srv6_multiseg6(resolved_hop, num_segs, segs);
+	}
+
 
 	if (num_labels)
 		nexthop_add_labels(resolved_hop, label_type, num_labels,
@@ -2108,21 +2118,28 @@ static int nexthop_active(struct nexthop *nexthop, struct nhg_hash_entry *nhe,
 		}
 
 		policy = zebra_sr_policy_find(nexthop->srte_color, &endpoint);
+		struct nexthop nnh;
+		memset(&nnh, 0, sizeof(nnh));
+		nnh.type = policy->nhse->type;
+		nnh.vrf_id = policy->nhse->vrf_id;
+		nnh.weight = policy->nhse->weight;
+		nnh.ifindex = policy->nhse->ifindex;
+		nnh.gate.ipv4 = policy->nhse->gate.ipv4;
 		if (policy && policy->status == ZEBRA_SR_POLICY_UP) {
 			resolved = 0;
-			frr_each_safe (nhlfe_list, &policy->lsp->nhlfe_list,
-				       nhlfe) {
-				if (!CHECK_FLAG(nhlfe->flags,
-						NHLFE_FLAG_SELECTED)
-				    || CHECK_FLAG(nhlfe->flags,
-						  NHLFE_FLAG_DELETED))
-					continue;
+//			frr_each_safe (nhlfe_list, &policy->lsp->nhlfe_list,
+//				       nhlfe) {
+//				if (!CHECK_FLAG(nhlfe->flags,
+//						NHLFE_FLAG_SELECTED)
+//				    || CHECK_FLAG(nhlfe->flags,
+//						  NHLFE_FLAG_DELETED))
+//					continue;
 				SET_FLAG(nexthop->flags,
 					 NEXTHOP_FLAG_RECURSIVE);
-				nexthop_set_resolved(afi, nhlfe->nexthop,
+				nexthop_set_resolved(afi, &nnh,
 						     nexthop, policy);
 				resolved = 1;
-			}
+	//		}
 			if (resolved)
 				return 1;
 		}

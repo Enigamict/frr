@@ -39,9 +39,7 @@ int pathd_srte_segment_list_protocol_origin_modify(
 int pathd_srte_segment_list_originator_modify(struct nb_cb_modify_args *args);
 int pathd_srte_segment_list_segment_sid_value_modify(
 	struct nb_cb_modify_args *args);
-int pathd_srte_segment_list_segment_srv6_sid_modify(
-	struct nb_cb_modify_args *args);
-int pathd_srte_segment_list_segment_srv6_sid_destroy(
+int pathd_srte_segment_list_segment_srv6_modify(
 	struct nb_cb_modify_args *args);
 int pathd_srte_segment_list_segment_nai_destroy(
 	struct nb_cb_destroy_args *args);
@@ -58,13 +56,12 @@ pathd_srte_policy_lookup_entry(struct nb_cb_lookup_entry_args *args);
 int pathd_srte_policy_name_modify(struct nb_cb_modify_args *args);
 int pathd_srte_policy_name_destroy(struct nb_cb_destroy_args *args);
 int pathd_srte_policy_binding_sid_modify(struct nb_cb_modify_args *args);
+int pathd_srte_policy_binding_sid_srv6_modify(struct nb_cb_modify_args *args);
 int pathd_srte_policy_binding_sid_destroy(struct nb_cb_destroy_args *args);
 struct yang_data *
 pathd_srte_policy_is_operational_get_elem(struct nb_cb_get_elem_args *args);
 int pathd_srte_policy_candidate_path_create(struct nb_cb_create_args *args);
 int pathd_srte_policy_candidate_path_destroy(struct nb_cb_destroy_args *args);
-int pathd_srte_policy_candidate_path_weight_modify(
-	struct nb_cb_modify_args *args);
 int pathd_srte_policy_candidate_path_name_modify(
 	struct nb_cb_modify_args *args);
 const void *
@@ -116,23 +113,26 @@ int pathd_srte_policy_candidate_path_segment_list_name_destroy(
 void pathd_apply_finish(struct nb_cb_apply_finish_args *args);
 
 /* Optional 'cli_show' callbacks. */
-void cli_show_srte_segment_list(struct vty *vty, struct lyd_node *dnode,
+void cli_show_srte_segment_list(struct vty *vty, const struct lyd_node *dnode,
 				bool show_defaults);
-void cli_show_srte_segment_list_end(struct vty *vty, struct lyd_node *dnode);
-void cli_show_srte_segment_list_segment(struct vty *vty, struct lyd_node *dnode,
+void cli_show_srte_segment_list_end(struct vty *vty,
+				    const struct lyd_node *dnode);
+void cli_show_srte_segment_list_segment(struct vty *vty,
+					const struct lyd_node *dnode,
 					bool show_defaults);
-void cli_show_srte_policy(struct vty *vty, struct lyd_node *dnode,
+void cli_show_srte_policy(struct vty *vty, const struct lyd_node *dnode,
 			  bool show_defaults);
-void cli_show_srte_policy_end(struct vty *vty, struct lyd_node *dnode);
-void cli_show_srte_policy_name(struct vty *vty, struct lyd_node *dnode,
+void cli_show_srte_policy_end(struct vty *vty, const struct lyd_node *dnode);
+void cli_show_srte_policy_name(struct vty *vty, const struct lyd_node *dnode,
 			       bool show_defaults);
-void cli_show_srte_policy_binding_sid(struct vty *vty, struct lyd_node *dnode,
+void cli_show_srte_policy_binding_sid(struct vty *vty,
+				      const struct lyd_node *dnode,
 				      bool show_defaults);
 void cli_show_srte_policy_candidate_path(struct vty *vty,
-					 struct lyd_node *dnode,
+					 const struct lyd_node *dnode,
 					 bool show_defaults);
 void cli_show_srte_policy_candidate_path_end(struct vty *vty,
-					     struct lyd_node *dnode);
+					     const struct lyd_node *dnode);
 
 /* Utility functions */
 typedef void (*of_pref_cp_t)(enum objfun_type type, void *arg);

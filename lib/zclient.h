@@ -438,6 +438,7 @@ struct zapi_nexthop {
 
 	/* SRv6 Headend-behaviour */
 	struct in6_addr seg6_segs;
+	struct in6_addr seg6_multisegs[256];
 };
 
 /*
@@ -607,6 +608,9 @@ struct zapi_srte_tunnel {
 	mpls_label_t local_label;
 	uint8_t label_num;
 	mpls_label_t labels[MPLS_MAX_LABELS];
+	struct in6_addr sid[256];
+	struct in6_addr local_srv6_sid;
+	uint8_t num_seg;
 };
 
 struct zapi_sr_policy {

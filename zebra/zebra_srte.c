@@ -27,8 +27,12 @@
 #include "zebra/zebra_mpls.h"
 #include "zebra/zebra_rnh.h"
 #include "zebra/zapi_msg.h"
+#include "zebra/zebra_vrf.h"
+
+#include "table.h"
 
 DEFINE_MTYPE_STATIC(ZEBRA, ZEBRA_SR_POLICY, "SR Policy");
+DEFINE_MTYPE_STATIC(ZEBRA, ZEBRA_SR_POLICY_NEXTHOP, "SRV6 Policy");
 
 static void zebra_sr_policy_deactivate(struct zebra_sr_policy *policy);
 
@@ -96,6 +100,77 @@ struct zebra_sr_policy *zebra_sr_policy_find_by_name(char *name)
 	return NULL;
 }
 
+static int zebra_srv6_policy_notify_update_client(struct zebra_sr_policy *policy,
+						struct zserv *client)
+{
+	struct stream *s;
+	uint32_t message = 0;
+	unsigned long nump;
+	uint8_t num = 1;
+	struct zapi_nexthop znh;
+	int ret;
+
+
+	/* Get output stream. */
+	s = stream_new(ZEBRA_MAX_PACKET_SIZ);
+
+	zclient_create_header(s, ZEBRA_NEXTHOP_UPDATE, zvrf_id(policy->zvrf));
+
+	/* Message flags. */
+	SET_FLAG(message, ZAPI_MESSAGE_SRTE);
+	stream_putl(s, message);
+
+	stream_putw(s, SAFI_UNICAST);
+	switch (policy->endpoint.ipa_type) {
+	case IPADDR_V4:
+		stream_putw(s, AF_INET);
+		stream_putc(s, IPV4_MAX_BITLEN);
+		stream_put_in_addr(s, &policy->endpoint.ipaddr_v4);
+		break;
+	case IPADDR_V6:
+		stream_putw(s, AF_INET6);
+		stream_putc(s, IPV6_MAX_BITLEN);
+		stream_put(s, &policy->endpoint.ipaddr_v6, IPV6_MAX_BYTELEN);
+		break;
+	default:
+		flog_warn(EC_LIB_DEVELOPMENT,
+			  "%s: unknown policy endpoint address family: %u",
+			  __func__, policy->endpoint.ipa_type);
+		exit(1);
+	}
+	
+	stream_putl(s, policy->color);
+
+	stream_putc(s, 0);
+	stream_putw(s, 0); /* instance - not available */
+	stream_putc(s, 0);
+	stream_putl(s, 20); /* metric - not available */
+	nump = stream_get_endp(s);
+	stream_putc(s, 0);
+
+	struct nexthop nnh;
+	memset(&nnh, 0, sizeof(nnh));
+	nnh.type = policy->nhse->type;
+	nnh.vrf_id = policy->nhse->vrf_id;
+	nnh.weight = policy->nhse->weight;
+
+	zapi_nexthop_from_nexthop(&znh, &nnh);
+	ret = zapi_nexthop_encode(s, &znh, 0, message);
+	if (ret < 0){
+		goto failure;
+	}
+	stream_putc_at(s, nump, num);
+	stream_putw_at(s, 0, stream_get_endp(s));
+
+	client->nh_last_upd_time = monotime(NULL);
+	return zserv_send_message(client, s);
+
+failure:
+
+	stream_free(s);
+	return -1;
+}
+
 static int zebra_sr_policy_notify_update_client(struct zebra_sr_policy *policy,
 						struct zserv *client)
 {
@@ -135,7 +210,6 @@ static int zebra_sr_policy_notify_update_client(struct zebra_sr_policy *policy,
 		exit(1);
 	}
 	stream_putl(s, policy->color);
-
 	num = 0;
 	frr_each (nhlfe_list_const, &policy->lsp->nhlfe_list, nhlfe) {
 		if (!CHECK_FLAG(nhlfe->flags, NHLFE_FLAG_SELECTED)
@@ -170,7 +244,7 @@ failure:
 	return -1;
 }
 
-static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
+static void zebra_srv6_policy_notify_update(struct zebra_sr_policy *policy)
 {
 	struct rnh *rnh;
 	struct prefix p = {};
@@ -203,14 +277,104 @@ static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
 
 	for (ALL_LIST_ELEMENTS_RO(rnh->client_list, node, client)) {
 		if (policy->status == ZEBRA_SR_POLICY_UP)
+			zebra_srv6_policy_notify_update_client(policy, client);
+	}
+}
+static void zebra_sr_policy_notify_update(struct zebra_sr_policy *policy)
+{
+	struct rnh *rnh;
+	struct prefix p = {};
+	struct zebra_vrf *zvrf;
+	struct listnode *node;
+	struct zserv *client;
+
+	zvrf = policy->zvrf;
+	switch (policy->endpoint.ipa_type) {
+	case IPADDR_V4:
+		p.family = AF_INET;
+		p.prefixlen = IPV4_MAX_BITLEN;
+		p.u.prefix4 = policy->endpoint.ipaddr_v4;
+		break;
+	case IPADDR_V6:
+		p.family = AF_INET6;
+		p.prefixlen = IPV6_MAX_BITLEN;
+		p.u.prefix6 = policy->endpoint.ipaddr_v6;
+		break;
+	default:
+		flog_warn(EC_LIB_DEVELOPMENT,
+			  "%s: unknown policy endpoint address family: %u",
+			  __func__, policy->endpoint.ipa_type);
+		exit(1);
+	}
+
+	rnh = zebra_lookup_rnh(&p, zvrf_id(zvrf), SAFI_UNICAST);
+	if (!rnh)
+		return;
+
+	for (ALL_LIST_ELEMENTS_RO(rnh->client_list, node, client)) {
+		if (policy->status == ZEBRA_SR_POLICY_UP){
 			zebra_sr_policy_notify_update_client(policy, client);
-		else
+		}else{
 			/* Fallback to the IGP shortest path. */
 			zebra_send_rnh_update(rnh, client, zvrf_id(zvrf),
 					      policy->color);
+		}
 	}
 }
+ static void zebra_srv6te_nexthop(struct zebra_sr_policy *policy) 
+ {
 
+	struct route_node *rn;
+	struct route_entry *re;
+	struct route_table *table = NULL;
+	struct zebra_vrf *zvrf = NULL;
+	struct prefix_ipv6 sidmask;
+	const struct nexthop_group *nhg;
+	const struct nexthop *nexthop;
+	struct in6_addr sid_res;
+	ifindex_t if_index;
+	afi_t afi = 2;
+	safi_t safi = 1;
+	char buf[SRCDEST2STR_BUFFER];
+
+	char buf_prefix[INET6_ADDRSTRLEN];
+//	inet_ntop(AF_INET6, &policy->segment_list.sid[0], buf_prefix,
+//			  sizeof(buf_prefix));
+//	zlog_debug("mask:%s", buf_prefix);
+
+	sidmask.family = AF_INET6;
+	sidmask.prefix = policy->segment_list.sid[0];
+	sidmask.prefixlen = 64;
+	apply_mask_ipv6(&sidmask);
+	inet_ntop(AF_INET6, &sidmask.prefix, buf_prefix,
+			  sizeof(buf_prefix));
+	zlog_debug("mask:%s", buf_prefix);
+	char cmp1[64];
+	strcat(buf_prefix,"/64");
+	zlog_debug("sn:%s", buf_prefix);
+
+	table = zebra_vrf_table(afi, safi, zvrf_id(zvrf));
+	zlog_debug("%ld", table->count);
+	for (rn = route_top(table); rn; rn = srcdest_route_next(rn)) {
+		RNODE_FOREACH_RE (rn, re) {
+			nhg = rib_get_fib_nhg(re);
+			for (ALL_NEXTHOPS_PTR(nhg, nexthop)) {
+				zlog_debug("%d", nexthop->ifindex);
+				zlog_debug("%s", buf_prefix);
+				if (!strcmp(srcdest_rnode2str(rn, buf, sizeof(buf)),buf_prefix)){
+					zlog_debug("match");
+					if_index = nexthop->ifindex;
+				}
+			}
+		}
+	}
+	policy->nhse = XCALLOC(MTYPE_ZEBRA_SR_POLICY_NEXTHOP,
+			       sizeof(struct zebra_srv6te_nexthop));
+	policy->nhse->type = NEXTHOP_TYPE_IPV4;
+	policy->nhse->vrf_id = 0;
+	policy->nhse->weight = 0;
+	policy->nhse->ifindex = if_index;
+}
 static void zebra_sr_policy_activate(struct zebra_sr_policy *policy,
 				     struct zebra_lsp *lsp)
 {
@@ -222,6 +386,15 @@ static void zebra_sr_policy_activate(struct zebra_sr_policy *policy,
 	zebra_sr_policy_notify_update(policy);
 }
 
+static void zebra_srv6_policy_activate(struct zebra_sr_policy *policy)
+{
+	policy->status = ZEBRA_SR_POLICY_UP;
+	//zebra_srv6_policy_bsid_install();
+	zebra_srv6te_nexthop(policy);
+	zsend_sr_policy_notify_status(policy->color, &policy->endpoint,
+				      policy->name, ZEBRA_SR_POLICY_UP);
+	zebra_srv6_policy_notify_update(policy);
+}
 static void zebra_sr_policy_update(struct zebra_sr_policy *policy,
 				   struct zebra_lsp *lsp,
 				   struct zapi_srte_tunnel *old_tunnel)
@@ -267,27 +440,30 @@ static void zebra_sr_policy_deactivate(struct zebra_sr_policy *policy)
 int zebra_sr_policy_validate(struct zebra_sr_policy *policy,
 			     struct zapi_srte_tunnel *new_tunnel)
 {
-	struct zapi_srte_tunnel old_tunnel = policy->segment_list;
-	struct zebra_lsp *lsp;
+//	struct zapi_srte_tunnel old_tunnel = policy->segment_list;
+//	struct zebra_lsp *lsp;
 
 	if (new_tunnel)
 		policy->segment_list = *new_tunnel;
 
 	/* Try to resolve the Binding-SID nexthops. */
-	lsp = mpls_lsp_find(policy->zvrf, policy->segment_list.labels[0]);
-	if (!lsp || !lsp->best_nhlfe
-	    || lsp->addr_family != ipaddr_family(&policy->endpoint)) {
-		if (policy->status == ZEBRA_SR_POLICY_UP)
-			zebra_sr_policy_deactivate(policy);
-		return -1;
-	}
+//	lsp = mpls_lsp_find(policy->zvrf, policy->segment_list.labels[0]);
+//	if (!lsp || !lsp->best_nhlfe
+//	    || lsp->addr_family != ipaddr_family(&policy->endpoint)) {
+//		if (policy->status == ZEBRA_SR_POLICY_UP)
+//			zebra_sr_policy_deactivate(policy);
+//		return -1;
+//	}
+
 
 	/* First label was resolved successfully. */
-	if (policy->status == ZEBRA_SR_POLICY_DOWN)
-		zebra_sr_policy_activate(policy, lsp);
-	else
-		zebra_sr_policy_update(policy, lsp, &old_tunnel);
-
+	if (policy->status == ZEBRA_SR_POLICY_DOWN){
+		zebra_srv6_policy_activate(policy);
+		//zebra_sr_policy_activate(policy, lsp);
+	}else{
+		//zebra_sr_policy_update(policy, lsp, &old_tunnel);
+		zebra_srv6_policy_activate(policy);
+	}
 	return 0;
 }
 

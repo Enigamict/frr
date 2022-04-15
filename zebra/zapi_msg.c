@@ -2570,23 +2570,27 @@ static void zread_sr_policy_set(ZAPI_HANDLER_ARGS)
 		return;
 	}
 	zt = &zp.segment_list;
-	if (zt->label_num < 1) {
-		if (IS_ZEBRA_DEBUG_RECV)
-			zlog_debug(
-				"%s: SR-TE tunnel must contain at least one label",
-				__func__);
-		return;
-	}
-
-	if (!mpls_enabled)
-		return;
-
+//	if (zt->label_num < 1) {
+//		if (IS_ZEBRA_DEBUG_RECV)
+//			zlog_debug(
+//				"%s: SR-TE tunnel must contain at least one label",
+//				__func__);
+//		return;
+//	}
+//
+//	if (!mpls_enabled)
+//		return;
+//
 	policy = zebra_sr_policy_find(zp.color, &zp.endpoint);
 	if (!policy)
 		policy = zebra_sr_policy_add(zp.color, &zp.endpoint, zp.name);
 	/* TODO: per-VRF list of SR-TE policies. */
 	policy->zvrf = zvrf;
 
+	char buf_prefix[INET6_ADDRSTRLEN];
+	inet_ntop(AF_INET6, &zp.segment_list.sid, buf_prefix,
+		  sizeof(buf_prefix));
+	zlog_debug("%s:srv6sid", buf_prefix);
 	zebra_sr_policy_validate(policy, &zp.segment_list);
 }
 

@@ -79,6 +79,7 @@
 #include "zebra/zebra_vxlan.h"
 #include "zebra/zebra_errors.h"
 #include "zebra/zebra_evpn_mh.h"
+#include "zebra/zebra_srte.h"
 
 #ifndef AF_MPLS
 #define AF_MPLS 28
@@ -1336,6 +1337,36 @@ static bool _netlink_route_encode_nexthop_src(const struct nexthop *nexthop,
 	return true;
 }
 
+static ssize_t fill_multiseg6ipt_encap(char *buffer, size_t buflen,
+				  const struct in6_addr *seg, uint8_t num_segs)
+{
+	struct seg6_iptunnel_encap *ipt;
+	struct ipv6_sr_hdr *srh;
+	const size_t srhlen = 8 + 16 * num_segs;
+
+	if (buflen < (sizeof(struct seg6_iptunnel_encap)
+		      + sizeof(struct ipv6_sr_hdr) + 16))
+		return -1;
+
+	memset(buffer, 0, buflen);
+
+	ipt = (struct seg6_iptunnel_encap *)buffer;
+	ipt->mode = SEG6_IPTUN_MODE_ENCAP;
+	srh = ipt->srh;
+	srh->hdrlen = (srhlen >> 3) - 1;
+	srh->type = 4;
+	srh->segments_left = num_segs - 1;
+	srh->first_segment = num_segs - 1;
+
+	for (ssize_t i = srh->first_segment; i >= 0; i--) {
+		memcpy(&srh->segments[i], &seg[num_segs - 1 - i],
+		       sizeof(struct in6_addr));
+	}
+
+	return srhlen + 4;
+
+}
+
 static ssize_t fill_seg6ipt_encap(char *buffer, size_t buflen,
 				  const struct in6_addr *seg)
 {
@@ -1368,6 +1399,7 @@ static ssize_t fill_seg6ipt_encap(char *buffer, size_t buflen,
 	memcpy(&srh->segments[0], seg, sizeof(struct in6_addr));
 
 	return srhlen + 4;
+
 }
 
 /* This function takes a nexthop as argument and adds
@@ -1395,6 +1427,7 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 	char label_buf[256];
 	struct vrf *vrf;
 	char addrstr[INET6_ADDRSTRLEN];
+	zlog_debug("net");
 
 	assert(nexthop);
 
@@ -1406,6 +1439,7 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 		return false;
 
 	if (nexthop->nh_srv6) {
+		zlog_debug("test");
 		if (nexthop->nh_srv6->seg6local_action !=
 		    ZEBRA_SEG6_LOCAL_ACTION_UNSPEC) {
 			struct rtattr *nest;
@@ -1475,11 +1509,11 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 			}
 			nl_attr_nest_end(nlmsg, nest);
 		}
-
 		if (!sid_zero(&nexthop->nh_srv6->seg6_segs)) {
 			char tun_buf[4096];
 			ssize_t tun_len;
 			struct rtattr *nest;
+			zlog_debug("test1");
 
 			if (!nl_attr_put16(nlmsg, req_size, RTA_ENCAP_TYPE,
 					  LWTUNNEL_ENCAP_SEG6))
@@ -1496,7 +1530,29 @@ static bool _netlink_route_build_singlepath(const struct prefix *p,
 				return false;
 			nl_attr_nest_end(nlmsg, nest);
 		}
-	}
+
+		if (!sid_zero(nexthop->nh_srv6->seg6_multisegs)) {
+			char tun_buf[4096];
+			ssize_t tun_len;
+			struct rtattr *nest;
+
+			if (!nl_attr_put16(nlmsg, req_size, RTA_ENCAP_TYPE,
+					  LWTUNNEL_ENCAP_SEG6))
+				return false;
+			nest = nl_attr_nest(nlmsg, req_size, RTA_ENCAP);
+			if (!nest)
+				return false;
+			tun_len = fill_multiseg6ipt_encap(tun_buf, sizeof(tun_buf),
+					nexthop->nh_srv6->seg6_multisegs,
+					nexthop->nh_srv6->num_segs);
+			if (tun_len < 0)
+				return false;
+			if (!nl_attr_put(nlmsg, req_size, SEG6_IPTUNNEL_SRH,
+					 tun_buf, tun_len))
+				return false;
+			nl_attr_nest_end(nlmsg, nest);
+		}
+    }
 
 	if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK))
 		rtmsg->rtm_flags |= RTNH_F_ONLINK;
@@ -2017,8 +2073,9 @@ ssize_t netlink_route_multipath_msg_encode(int cmd,
 	 */
 	nexthop = dplane_ctx_get_ng(ctx)->nexthop;
 	if (nexthop) {
-		if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_RECURSIVE))
+		if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_RECURSIVE)){
 			nexthop = nexthop->resolved;
+		}
 
 		if (nexthop->type == NEXTHOP_TYPE_BLACKHOLE) {
 			switch (nexthop->bh_type) {
@@ -2582,6 +2639,7 @@ ssize_t netlink_nexthop_msg_encode(uint16_t cmd,
 					char tun_buf[4096];
 					ssize_t tun_len;
 					struct rtattr *nest;
+					zlog_debug("aaaaaaa");
 
 					if (!nl_attr_put16(&req->n, buflen,
 					    NHA_ENCAP_TYPE,
@@ -2594,6 +2652,31 @@ ssize_t netlink_nexthop_msg_encode(uint16_t cmd,
 					tun_len = fill_seg6ipt_encap(tun_buf,
 					    sizeof(tun_buf),
 					    &nh->nh_srv6->seg6_segs);
+					if (tun_len < 0)
+						return 0;
+					if (!nl_attr_put(&req->n, buflen,
+							 SEG6_IPTUNNEL_SRH,
+							 tun_buf, tun_len))
+						return 0;
+					nl_attr_nest_end(&req->n, nest);
+				}
+				if (!sid_zero(nh->nh_srv6->seg6_multisegs)) {
+					char tun_buf[4096];
+					ssize_t tun_len;
+					struct rtattr *nest;
+
+					if (!nl_attr_put16(&req->n, buflen,
+					    NHA_ENCAP_TYPE,
+					    LWTUNNEL_ENCAP_SEG6))
+						return 0;
+					nest = nl_attr_nest(&req->n, buflen,
+					    NHA_ENCAP | NLA_F_NESTED);
+					if (!nest)
+						return 0;
+					tun_len = fill_multiseg6ipt_encap(tun_buf,
+					    sizeof(tun_buf),
+					    nh->nh_srv6->seg6_multisegs,
+						nh->nh_srv6->num_segs);
 					if (tun_len < 0)
 						return 0;
 					if (!nl_attr_put(&req->n, buflen,

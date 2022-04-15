@@ -84,14 +84,14 @@ module frr-pathd {
           leaf index {
             type uint32;
             description "Segment index";
-	      }
+	  }
         leaf sid-value {
           type rt-types:mpls-label;
           description "MPLS label value";
-          }
+        }
         leaf srv6sid {
           type inet:ip-address;
-          description "Segment Routing global configuration.";
+          description "srv6 sid";
         }
         container nai {
           presence "The segment has a Node or Adjacency Identifier";
@@ -189,8 +189,13 @@ module frr-pathd {
           description
             "Name of the SR Policy.";
         }
-        leaf binding-sid {
+        leaf binding-sid-mpls {
           type rt-types:mpls-label;
+          description
+            "BSID of the SR Policy.";
+        }
+        leaf binding-sid-srv6 {
+          type inet:ip-address;
           description
             "BSID of the SR Policy.";
         }
@@ -240,7 +245,6 @@ module frr-pathd {
             config false;
             description "Candidate path distinguisher";
           }
-          
           leaf type {
             description
               "Type of the Candidate Path.";

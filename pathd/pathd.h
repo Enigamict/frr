@@ -192,6 +192,8 @@ struct srte_segment_entry {
 	/* Support draft-ietf-spring-segment-routing-policy sl types queries*/
 	uint8_t nai_local_prefix_len;
 	uint8_t nai_algorithm;
+	struct  in6_addr sid;
+	
 };
 RB_HEAD(srte_segment_entry_head, srte_segment_entry);
 RB_PROTOTYPE(srte_segment_entry_head, srte_segment_entry, entry,
@@ -295,7 +297,6 @@ struct srte_candidate {
 
 	/* Flags. */
 	uint32_t flags;
-
 #define F_CANDIDATE_BEST 0x0001
 #define F_CANDIDATE_NEW 0x0002
 #define F_CANDIDATE_MODIFIED 0x0004
@@ -341,6 +342,8 @@ struct srte_policy {
 
 	/* Binding SID */
 	mpls_label_t binding_sid;
+
+	struct in6_addr binding_sid_srv6;
 
 	/* The Protocol-Origin. */
 	enum srte_protocol_origin protocol_origin;
