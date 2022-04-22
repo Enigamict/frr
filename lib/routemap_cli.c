@@ -550,23 +550,18 @@ void route_map_condition_show(struct vty *vty, const struct lyd_node *dnode,
 		vty_out(vty, " match interface %s\n",
 			yang_dnode_get_string(
 				dnode, "./rmap-match-condition/interface"));
-	} else if (IS_MATCH_IPv4_ADDRESS_LIST(condition)
-		   || IS_MATCH_IPv6_NEXTHOP_LIST(condition)
-		   || IS_MATCH_IPv4_NEXTHOP_LIST(condition)) {
-		acl = NULL;
-		if ((ln = yang_dnode_get(dnode,
-					 "./rmap-match-condition/list-name"))
-		    != NULL)
-			acl = yang_dnode_get_string(ln, NULL);
-
-		assert(acl);
-
-		if (IS_MATCH_IPv4_ADDRESS_LIST(condition))
-			vty_out(vty, " match ip address %s\n", acl);
-		else if (IS_MATCH_IPv4_NEXTHOP_LIST(condition))
-			vty_out(vty, " match ip next-hop %s\n", acl);
-		else
-			vty_out(vty, " match ipv6 next-hop %s\n", acl);
+	} else if (IS_MATCH_IPv4_ADDRESS_LIST(condition)) {
+		vty_out(vty, " match ip address %s\n",
+			yang_dnode_get_string(
+				dnode, "./rmap-match-condition/list-name"));
+	} else if (IS_MATCH_IPv4_NEXTHOP_LIST(condition)) {
+		vty_out(vty, " match ip next-hop %s\n",
+			yang_dnode_get_string(
+				dnode, "./rmap-match-condition/list-name"));
+	} else if (IS_MATCH_IPv6_NEXTHOP_LIST(condition)) {
+		vty_out(vty, " match ipv6 next-hop %s\n",
+			yang_dnode_get_string(
+				dnode, "./rmap-match-condition/list-name"));
 	} else if (IS_MATCH_IPv4_PREFIX_LIST(condition)) {
 		vty_out(vty, " match ip address prefix-list %s\n",
 			yang_dnode_get_string(
@@ -640,6 +635,11 @@ void route_map_condition_show(struct vty *vty, const struct lyd_node *dnode,
 			yang_dnode_get_string(
 				dnode,
 				"./rmap-match-condition/frr-bgp-route-map:alias"));
+	} else if (IS_MATCH_SCRIPT(condition)) {
+		vty_out(vty, " match script %s\n",
+			yang_dnode_get_string(
+				dnode,
+				"./rmap-match-condition/frr-bgp-route-map:script"));
 	} else if (IS_MATCH_ORIGIN(condition)) {
 		vty_out(vty, " match origin %s\n",
 			yang_dnode_get_string(
@@ -719,84 +719,40 @@ void route_map_condition_show(struct vty *vty, const struct lyd_node *dnode,
 				dnode,
 				"./rmap-match-condition/frr-bgp-route-map:list-name"));
 	} else if (IS_MATCH_ROUTE_SRC(condition)) {
-		acl = NULL;
-		if ((ln = yang_dnode_get(
-			     dnode,
-			     "./rmap-match-condition/frr-bgp-route-map:list-name"))
-		    != NULL)
-			acl = yang_dnode_get_string(ln, NULL);
-
-		assert(acl);
-
-		vty_out(vty, " match ip route-source %s\n", acl);
+		vty_out(vty, " match ip route-source %s\n",
+			yang_dnode_get_string(
+				dnode,
+				"./rmap-match-condition/frr-bgp-route-map:list-name"));
 	} else if (IS_MATCH_ROUTE_SRC_PL(condition)) {
 		vty_out(vty, " match ip route-source prefix-list %s\n",
 			yang_dnode_get_string(
 				dnode,
 				"./rmap-match-condition/frr-bgp-route-map:list-name"));
-	} else if (IS_MATCH_ROUTE_SRC(condition)) {
-		acl = NULL;
-		if ((ln = yang_dnode_get(
-			     dnode,
-			     "./rmap-match-condition/frr-bgp-route-map:list-name"))
-		    != NULL)
-			acl = yang_dnode_get_string(ln, NULL);
-
-		assert(acl);
-
-		vty_out(vty, " match ip route-source %s\n", acl);
 	} else if (IS_MATCH_COMMUNITY(condition)) {
-		acl = NULL;
-		if ((ln = yang_dnode_get(
-				 dnode,
-				 "./rmap-match-condition/frr-bgp-route-map:comm-list/comm-list-name"))
-			!= NULL) {
-			acl = yang_dnode_get_string(ln, NULL);
-
-			if (true
-			    == yang_dnode_get_bool(
-				    dnode,
-				    "./rmap-match-condition/frr-bgp-route-map:comm-list/comm-list-name-exact-match"))
-				vty_out(vty,
-					" match community %s exact-match\n",
-					acl);
-			else
-				vty_out(vty, " match community %s\n", acl);
-		}
-
-		assert(acl);
+		vty_out(vty, " match community %s",
+			yang_dnode_get_string(
+				dnode,
+				"./rmap-match-condition/frr-bgp-route-map:comm-list/comm-list-name"));
+		if (yang_dnode_get_bool(
+			    dnode,
+			    "./rmap-match-condition/frr-bgp-route-map:comm-list/comm-list-name-exact-match"))
+			vty_out(vty, " exact-match");
+		vty_out(vty, "\n");
 	} else if (IS_MATCH_LCOMMUNITY(condition)) {
-		acl = NULL;
-		if ((ln = yang_dnode_get(
-				 dnode,
-				 "./rmap-match-condition/frr-bgp-route-map:comm-list/comm-list-name"))
-			!= NULL) {
-			acl = yang_dnode_get_string(ln, NULL);
-
-			if (true
-			    == yang_dnode_get_bool(
-				    dnode,
-				    "./rmap-match-condition/frr-bgp-route-map:comm-list/comm-list-name-exact-match"))
-				vty_out(vty,
-					" match large-community %s exact-match\n",
-					acl);
-			else
-				vty_out(vty, " match large-community %s\n",
-					acl);
-		}
-
-		assert(acl);
+		vty_out(vty, " match large-community %s",
+			yang_dnode_get_string(
+				dnode,
+				"./rmap-match-condition/frr-bgp-route-map:comm-list/comm-list-name"));
+		if (yang_dnode_get_bool(
+			    dnode,
+			    "./rmap-match-condition/frr-bgp-route-map:comm-list/comm-list-name-exact-match"))
+			vty_out(vty, " exact-match");
+		vty_out(vty, "\n");
 	} else if (IS_MATCH_EXTCOMMUNITY(condition)) {
-		acl = NULL;
-		if ((ln = yang_dnode_get(
-				 dnode,
-				 "./rmap-match-condition/frr-bgp-route-map:comm-list/comm-list-name"))
-			!= NULL)
-			acl = yang_dnode_get_string(ln, NULL);
-
-		assert(acl);
-
-		vty_out(vty, " match extcommunity %s\n", acl);
+		vty_out(vty, " match extcommunity %s\n",
+			yang_dnode_get_string(
+				dnode,
+				"./rmap-match-condition/frr-bgp-route-map:comm-list/comm-list-name"));
 	} else if (IS_MATCH_IPV4_NH(condition)) {
 		vty_out(vty, " match ip next-hop address %s\n",
 			yang_dnode_get_string(
@@ -1478,41 +1434,6 @@ void route_map_optimization_disabled_show(struct vty *vty,
 		name);
 }
 
-#if CONFDATE > 20220409
-CPP_NOTICE("Time to remove old route-map optimization command")
-#endif
-
-DEFPY_HIDDEN(
-	routemap_optimization, routemap_optimization_cmd,
-	"[no] route-map optimization",
-	NO_STR
-	"route-map\n"
-	"optimization\n")
-{
-	const struct lyd_node *rmi_dnode;
-	const char *rm_name;
-	char xpath[XPATH_MAXLEN];
-
-	vty_out(vty,
-		"%% This command is deprecated. Please, use `route-map NAME optimization` from the config node.\n");
-
-	rmi_dnode =
-		yang_dnode_get(vty->candidate_config->dnode, VTY_CURR_XPATH);
-	if (!rmi_dnode) {
-		vty_out(vty, "%% Failed to get RMI dnode in candidate DB\n");
-		return CMD_WARNING_CONFIG_FAILED;
-	}
-
-	rm_name = yang_dnode_get_string(rmi_dnode, "../name");
-
-	snprintf(
-		xpath, sizeof(xpath),
-		"/frr-route-map:lib/route-map[name='%s']/optimization-disabled",
-		rm_name);
-	nb_cli_enqueue_change(vty, xpath, NB_OP_MODIFY, no ? "true" : "false");
-	return nb_cli_apply_changes(vty, NULL);
-}
-
 static int route_map_config_write(struct vty *vty)
 {
 	const struct lyd_node *dnode;
@@ -1631,6 +1552,4 @@ void route_map_cli_init(void)
 
 	install_element(RMAP_NODE, &set_srte_color_cmd);
 	install_element(RMAP_NODE, &no_set_srte_color_cmd);
-
-	install_element(RMAP_NODE, &routemap_optimization_cmd);
 }

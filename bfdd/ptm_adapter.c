@@ -457,7 +457,7 @@ static int _ptm_msg_read(struct stream *msg, int command, vrf_id_t vrf_id,
 	}
 
 	/* Sanity check: peer and local address must match IP types. */
-	if (bpc->bpc_local.sa_sin.sin_family != 0
+	if (bpc->bpc_local.sa_sin.sin_family != AF_UNSPEC
 	    && (bpc->bpc_local.sa_sin.sin_family
 		!= bpc->bpc_peer.sa_sin.sin_family)) {
 		zlog_warn("ptm-read: peer family doesn't match local type");
@@ -721,11 +721,6 @@ void bfdd_sessions_enable_vrf(struct vrf *vrf)
 	/* it may affect configs without interfaces */
 	TAILQ_FOREACH(bso, &bglobal.bg_obslist, bso_entry) {
 		bs = bso->bso_bs;
-		/* update name */
-		if (bs->vrf && bs->vrf == vrf) {
-			if (!strmatch(bs->key.vrfname, vrf->name))
-				bfd_session_update_vrf_name(bs, vrf);
-		}
 		if (bs->vrf)
 			continue;
 		if (bs->key.vrfname[0] &&

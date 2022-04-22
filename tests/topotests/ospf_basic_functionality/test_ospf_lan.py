@@ -120,7 +120,7 @@ def setup_module(mod):
     daemons = topo_daemons(tgen, topo)
 
     # Starting topology, create tmp files which are loaded to routers
-    #  to start deamons and then start routers
+    #  to start daemons and then start routers
     start_topology(tgen, daemons)
 
     # Creating configuration from JSON
@@ -413,6 +413,7 @@ def test_ospf_lan_tc1_p0(request):
 
     build_config_from_json(tgen, topo_modify_change_ip, save_bkup=False)
 
+    clear_ospf(tgen, "r0")
     step(
         "Verify that OSPF is in FULL state with other routers with "
         "newly configured IP."

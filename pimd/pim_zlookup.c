@@ -36,22 +36,23 @@
 #include "pim_str.h"
 #include "pim_oil.h"
 #include "pim_zlookup.h"
+#include "pim_addr.h"
 
 static struct zclient *zlookup = NULL;
 struct thread *zlookup_read;
 
 static void zclient_lookup_sched(struct zclient *zlookup, int delay);
-static int zclient_lookup_read_pipe(struct thread *thread);
+static void zclient_lookup_read_pipe(struct thread *thread);
 
 /* Connect to zebra for nexthop lookup. */
-static int zclient_lookup_connect(struct thread *t)
+static void zclient_lookup_connect(struct thread *t)
 {
 	struct zclient *zlookup;
 
 	zlookup = THREAD_ARG(t);
 
 	if (zlookup->sock >= 0) {
-		return 0;
+		return;
 	}
 
 	if (zclient_socket_connect(zlookup) < 0) {
@@ -73,12 +74,11 @@ static int zclient_lookup_connect(struct thread *t)
 	if (zlookup->sock < 0) {
 		/* Since last connect failed, retry within 10 secs */
 		zclient_lookup_sched(zlookup, 10);
-		return -1;
+		return;
 	}
 
 	thread_add_timer(router->master, zclient_lookup_read_pipe, zlookup, 60,
 			 &zlookup_read);
-	return 0;
 }
 
 /* Schedule connection with delay. */
@@ -300,9 +300,9 @@ static int zclient_read_nexthop(struct pim_instance *pim,
 			if (nbr) {
 				nexthop_tab[num_ifindex].nexthop_addr.family =
 					AF_INET;
-				nexthop_tab[num_ifindex]
-					.nexthop_addr.u.prefix4 =
-					nbr->source_addr;
+				pim_addr_to_prefix(
+					&nexthop_tab[num_ifindex].nexthop_addr,
+					nbr->source_addr);
 			}
 			++num_ifindex;
 			break;
@@ -381,23 +381,27 @@ static int zclient_lookup_nexthop_once(struct pim_instance *pim,
 	return zclient_read_nexthop(pim, zlookup, nexthop_tab, tab_size, addr);
 }
 
-int zclient_lookup_read_pipe(struct thread *thread)
+void zclient_lookup_read_pipe(struct thread *thread)
 {
 	struct zclient *zlookup = THREAD_ARG(thread);
 	struct pim_instance *pim = pim_get_pim_instance(VRF_DEFAULT);
 	struct pim_zlookup_nexthop nexthop_tab[10];
 	struct in_addr l = {.s_addr = INADDR_ANY};
 
+	if (!pim) {
+		if (PIM_DEBUG_PIM_NHT_DETAIL)
+			zlog_debug("%s: Unable to find pim instance", __func__);
+		return;
+	}
+
 	zclient_lookup_nexthop_once(pim, nexthop_tab, 10, l);
 	thread_add_timer(router->master, zclient_lookup_read_pipe, zlookup, 60,
 			 &zlookup_read);
-
-	return 1;
 }
 
 int zclient_lookup_nexthop(struct pim_instance *pim,
 			   struct pim_zlookup_nexthop nexthop_tab[],
-			   const int tab_size, struct in_addr addr,
+			   const int tab_size, pim_addr addr,
 			   int max_lookup)
 {
 	int lookup;
@@ -414,15 +418,11 @@ int zclient_lookup_nexthop(struct pim_instance *pim,
 		num_ifindex = zclient_lookup_nexthop_once(pim, nexthop_tab,
 							  tab_size, addr);
 		if (num_ifindex < 1) {
-			if (PIM_DEBUG_PIM_NHT) {
-				char addr_str[INET_ADDRSTRLEN];
-				pim_inet4_dump("<addr?>", addr, addr_str,
-					       sizeof(addr_str));
+			if (PIM_DEBUG_PIM_NHT_DETAIL)
 				zlog_debug(
-					"%s: lookup=%d/%d: could not find nexthop ifindex for address %s(%s)",
-					__func__, lookup, max_lookup, addr_str,
+					"%s: lookup=%d/%d: could not find nexthop ifindex for address %pPA(%s)",
+					__func__, lookup, max_lookup, &addr,
 					pim->vrf->name);
-			}
 			return -1;
 		}
 
@@ -451,23 +451,19 @@ int zclient_lookup_nexthop(struct pim_instance *pim,
 			if (lookup > 0) {
 				/* Report non-recursive success after first
 				 * lookup */
-				if (PIM_DEBUG_PIM_NHT) {
-					char addr_str[INET_ADDRSTRLEN];
-					pim_inet4_dump("<addr?>", addr,
-						       addr_str,
-						       sizeof(addr_str));
+				if (PIM_DEBUG_PIM_NHT)
 					zlog_debug(
-						"%s: lookup=%d/%d: found non-recursive ifindex=%d for address %s(%s) dist=%d met=%d",
+						"%s: lookup=%d/%d: found non-recursive ifindex=%d for address %pPA(%s) dist=%d met=%d",
 						__func__, lookup, max_lookup,
-						first_ifindex, addr_str,
+						first_ifindex, &addr,
 						pim->vrf->name,
 						nexthop_tab[0]
 							.protocol_distance,
 						nexthop_tab[0].route_metric);
-				}
 
 				/* use last address as nexthop address */
-				nexthop_tab[0].nexthop_addr.u.prefix4 = addr;
+				pim_addr_to_prefix(
+					&(nexthop_tab[0].nexthop_addr), addr);
 
 				/* report original route metric/distance */
 				nexthop_tab[0].route_metric = route_metric;
@@ -486,25 +482,22 @@ int zclient_lookup_nexthop(struct pim_instance *pim,
 			pim_addr_dump("<nexthop?>", &nexthop_addr, nexthop_str,
 				      sizeof(nexthop_str));
 			zlog_debug(
-				"%s: lookup=%d/%d: zebra returned recursive nexthop %s for address %s(%s) dist=%d met=%d",
+				"%s: lookup=%d/%d: zebra returned recursive nexthop %s for address %pPA(%s) dist=%d met=%d",
 				__func__, lookup, max_lookup, nexthop_str,
-				addr_str, pim->vrf->name,
+				&addr, pim->vrf->name,
 				nexthop_tab[0].protocol_distance,
 				nexthop_tab[0].route_metric);
 		}
 
-		addr = nexthop_addr.u.prefix4; /* use nexthop addr for
-						  recursive lookup */
+		addr = pim_addr_from_prefix(&(nexthop_addr)); /* use nexthop
+						  addr for recursive lookup */
 
 	} /* for (max_lookup) */
 
-	if (PIM_DEBUG_PIM_NHT) {
-		char addr_str[INET_ADDRSTRLEN];
-		pim_inet4_dump("<addr?>", addr, addr_str, sizeof(addr_str));
+	if (PIM_DEBUG_PIM_NHT)
 		zlog_warn(
-			"%s: lookup=%d/%d: failure searching recursive nexthop ifindex for address %s(%s)",
-			__func__, lookup, max_lookup, addr_str, pim->vrf->name);
-	}
+			"%s: lookup=%d/%d: failure searching recursive nexthop ifindex for address %pPA(%s)",
+			__func__, lookup, max_lookup, &addr, pim->vrf->name);
 
 	return -2;
 }
@@ -524,21 +517,20 @@ int pim_zlookup_sg_statistics(struct channel_oil *c_oil)
 	struct stream *s = zlookup->obuf;
 	uint16_t command = 0;
 	unsigned long long lastused;
-	struct prefix_sg sg;
+	pim_sgaddr sg;
 	int count = 0;
 	int ret;
 	struct interface *ifp =
 		pim_if_find_by_vif_index(c_oil->pim, c_oil->oil.mfcc_parent);
 
 	if (PIM_DEBUG_ZEBRA) {
-		struct prefix_sg more;
+		pim_sgaddr more;
 
 		more.src = c_oil->oil.mfcc_origin;
 		more.grp = c_oil->oil.mfcc_mcastgrp;
-		zlog_debug(
-			"Sending Request for New Channel Oil Information%s VIIF %d(%s)",
-			pim_str_sg_dump(&more), c_oil->oil.mfcc_parent,
-			c_oil->pim->vrf->name);
+		zlog_debug("Sending Request for New Channel Oil Information%pSG VIIF %d(%s)",
+			   &more, c_oil->oil.mfcc_parent,
+			   c_oil->pim->vrf->name);
 	}
 
 	if (!ifp)
@@ -587,15 +579,14 @@ int pim_zlookup_sg_statistics(struct channel_oil *c_oil)
 	if (sg.src.s_addr != c_oil->oil.mfcc_origin.s_addr
 	    || sg.grp.s_addr != c_oil->oil.mfcc_mcastgrp.s_addr) {
 		if (PIM_DEBUG_ZEBRA) {
-			struct prefix_sg more;
+			pim_sgaddr more;
 
 			more.src = c_oil->oil.mfcc_origin;
 			more.grp = c_oil->oil.mfcc_mcastgrp;
 			flog_err(
 				EC_LIB_ZAPI_MISSMATCH,
-				"%s: Received wrong %s(%s) information requested",
-				__func__, pim_str_sg_dump(&more),
-				c_oil->pim->vrf->name);
+				"%s: Received wrong %pSG(%s) information requested",
+				__func__, &more, c_oil->pim->vrf->name);
 		}
 		zclient_lookup_failed(zlookup);
 		return -3;

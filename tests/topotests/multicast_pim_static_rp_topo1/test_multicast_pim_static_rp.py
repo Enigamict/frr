@@ -69,7 +69,7 @@ TC_18 : Verify RPF interface updated in mroute when higher preferred RP gets
         deleted
 TC_19 : Verify IIF and OIL in "show ip pim state" updated when higher
         preferred overlapping RP is deleted
-TC_20 : Verfiy PIM upstream IIF updated when higher preferred overlapping RP
+TC_20 : Verify PIM upstream IIF updated when higher preferred overlapping RP
         deleted
 TC_21_1 : Verify OIF and RFP for (*,G) and (S,G) when static RP configure in
           LHR router
@@ -94,7 +94,7 @@ TC_30 : Verify IIF and OIL change to other path after shut the primary path
 TC_31 : Verify RP info and (*,G) mroute after deleting the RP and shut / no
         shut the RPF interface.
 TC_32 : Verify RP info and (*,G) mroute after deleting the RP and shut / no
-        shut the RPF inteface
+        shut the RPF interface
 """
 
 import os
@@ -137,7 +137,7 @@ from lib.pim import (
     verify_join_state_and_timer,
     verify_ip_mroutes,
     verify_pim_neighbors,
-    verify_pim_interface_traffic,
+    get_pim_interface_traffic,
     verify_pim_rp_info,
     verify_pim_state,
     clear_ip_pim_interface_traffic,
@@ -227,7 +227,7 @@ def setup_module(mod):
     daemons = topo_daemons(tgen, TOPO)
 
     # Starting topology, create tmp files which are loaded to routers
-    #  to start deamons and then start routers
+    #  to start daemons and then start routers
     start_topology(tgen, daemons)
 
     # Don"t run this test if we have any failure.
@@ -386,7 +386,7 @@ def test_add_delete_static_RP_p0(request):
     step("r1: Verify show ip pim interface traffic without any IGMP join")
     state_dict = {"r1": {"r1-r2-eth1": ["pruneTx"]}}
 
-    state_before = verify_pim_interface_traffic(tgen, state_dict)
+    state_before = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_before, dict
     ), "Testcase {} : Failed \n state_before is not dictionary\n Error: {}".format(
@@ -488,7 +488,7 @@ def test_add_delete_static_RP_p0(request):
     )
 
     step("r1: Verify show ip pim interface traffic without any IGMP join")
-    state_after = verify_pim_interface_traffic(tgen, state_dict)
+    state_after = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_after, dict
     ), "Testcase {} : Failed \n state_before is not dictionary \n Error: {}".format(
@@ -699,7 +699,7 @@ def test_not_reachable_static_RP_p0(request):
         "show ip pim interface traffic"
     )
     state_dict = {"r1": {"r1-r2-eth1": ["pruneTx"]}}
-    state_before = verify_pim_interface_traffic(tgen, state_dict)
+    state_before = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_before, dict
     ), "Testcase{} : Failed \n state_before is not dictionary \n " "Error: {}".format(
@@ -800,7 +800,7 @@ def test_not_reachable_static_RP_p0(request):
         "r1: (*,G) prune is sent towards the RP interface, verify using"
         "show ip pim interface traffic"
     )
-    state_after = verify_pim_interface_traffic(tgen, state_dict)
+    state_after = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_after, dict
     ), "Testcase{} : Failed \n state_before is not dictionary \n " "Error: {}".format(
@@ -888,7 +888,7 @@ def test_add_RP_after_join_received_p1(request):
 
     step("joinTx value before join sent")
     state_dict = {"r1": {"r1-r2-eth1": ["joinTx"]}}
-    state_before = verify_pim_interface_traffic(tgen, state_dict)
+    state_before = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_before, dict
     ), "Testcase{} : Failed \n state_before is not dictionary \n " "Error: {}".format(
@@ -979,7 +979,7 @@ def test_add_RP_after_join_received_p1(request):
     assert result is True, "Testcase {} :Failed \n Error: {}".format(tc_name, result)
     logger.info("Expected behavior: %s", result)
 
-    state_after = verify_pim_interface_traffic(tgen, state_dict)
+    state_after = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_after, dict
     ), "Testcase{} : Failed \n state_before is not dictionary \n " "Error: {}".format(
@@ -1024,7 +1024,7 @@ def test_reachable_static_RP_after_join_p0(request):
 
     step("r1 : Verify pim interface traffic")
     state_dict = {"r1": {"r1-r2-eth1": ["joinTx"]}}
-    state_before = verify_pim_interface_traffic(tgen, state_dict)
+    state_before = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_before, dict
     ), "Testcase{} : Failed \n state_before is not dictionary \n " "Error: {}".format(
@@ -1123,7 +1123,7 @@ def test_reachable_static_RP_after_join_p0(request):
     logger.info("Expected behavior: %s", result)
 
     step("r1 : Verify pim interface traffic")
-    state_after = verify_pim_interface_traffic(tgen, state_dict)
+    state_after = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_after, dict
     ), "Testcase{} : Failed \n state_before is not dictionary \n " "Error: {}".format(
@@ -1157,7 +1157,7 @@ def test_send_join_on_higher_preffered_rp_p1(request):
                 gets deleted
      TC_19_P1 : Verify IIF and OIL in "show ip pim state" updated when higher
                 preferred overlapping RP is deleted
-     TC_20_P1 : Verfiy PIM upstream IIF updated when higher preferred
+     TC_20_P1 : Verify PIM upstream IIF updated when higher preferred
                 overlapping RP deleted
 
     Topology used:
@@ -1211,7 +1211,7 @@ def test_send_join_on_higher_preffered_rp_p1(request):
     step("r1 : Verify joinTx count before sending join")
     state_dict = {"r1": {"r1-r4-eth3": ["joinTx"], "r1-r2-eth1": ["pruneTx"]}}
 
-    state_before = verify_pim_interface_traffic(tgen, state_dict)
+    state_before = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_before, dict
     ), "Testcase{} : Failed \n state_before is not dictionary \n " "Error: {}".format(
@@ -1261,7 +1261,7 @@ def test_send_join_on_higher_preffered_rp_p1(request):
 
     step("r1 : Verify join is sent to higher preferred RP")
     step("r1 : Verify prune is sent to lower preferred RP")
-    state_after = verify_pim_interface_traffic(tgen, state_dict)
+    state_after = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_after, dict
     ), "Testcase{} : Failed \n state_before is not dictionary \n " "Error: {}".format(
@@ -1293,7 +1293,7 @@ def test_send_join_on_higher_preffered_rp_p1(request):
     step("r1 : Verify joinTx, pruneTx count before RP gets deleted")
     state_dict = {"r1": {"r1-r2-eth1": ["joinTx"], "r1-r4-eth3": ["pruneTx"]}}
 
-    state_before = verify_pim_interface_traffic(tgen, state_dict)
+    state_before = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_before, dict
     ), "Testcase{} : Failed \n state_before is not dictionary \n " "Error: {}".format(
@@ -1354,7 +1354,7 @@ def test_send_join_on_higher_preffered_rp_p1(request):
     assert result is True, "Testcase {} :Failed \n Error: {}".format(tc_name, result)
 
     step(
-        "r1 : Verfiy upstream IIF updated when higher preferred overlapping"
+        "r1 : Verify upstream IIF updated when higher preferred overlapping"
         "RP deleted"
     )
     result = verify_upstream_iif(tgen, dut, iif, STAR, GROUP_ADDRESS)
@@ -1375,7 +1375,7 @@ def test_send_join_on_higher_preffered_rp_p1(request):
         "r1 : Verify prune is sent to higher preferred RP when higher"
         " preferred RP gets deleted"
     )
-    state_after = verify_pim_interface_traffic(tgen, state_dict)
+    state_after = get_pim_interface_traffic(tgen, state_dict)
     assert isinstance(
         state_after, dict
     ), "Testcase{} : Failed \n state_before is not dictionary \n " "Error: {}".format(
@@ -3820,7 +3820,7 @@ def test_delete_RP_shut_noshut_upstream_interface_p1(request):
 def test_delete_RP_shut_noshut_RP_interface_p1(request):
     """
     TC_32_P1: Verify RP info and (*,G) mroute after deleting the RP and shut/
-           no shut the RPF inteface
+           no shut the RPF interface
 
     Topology used:
                 ________r2_____
